@@ -1,33 +1,69 @@
-﻿cmake_minimum_required(VERSION 3.8)
-project(sparse LANGUAGES C)
-MESSAGE(STATUS "PROJECT_NAME: " ${PROJECT_NAME})
+﻿cmake_minimum_required(VERSION 3.10)
+project(sparse
+    VERSION 1.4
+    HOMEPAGE_URL https://github.com/aemeltsev/sparse
+    DESCRIPTION "A Sparse Linear Equation Solver"
+    LANGUAGES C)
 
-# Check platforms
-if (CMAKE_HOST_WIN32)
-    set(WINDOWS 1)
-elseif(CMAKE_HOST_APPLE)
-    set(MACOS 1)
-elseif(CMAKE_HOST_UNIX)
-    set(LINUX 1)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED YES)
+set(DEFAULT_BUILD_TYPE "Release")
+
+set(SPARSE_BUILD)
+option(SPARSE_SHARED "Shared build" OFF)
+option(SPARSE_STATIC "Static build" ON)
+option(SPARSE_USE_C99 "" OFF)
+option(SPARSE_USE_TEST "Enable Tests" OFF)
+
+if(CMAKE_SYSTEM_NAME STREQUAL WASI)
+  set(SPARSE_STATIC ON CACHE BOOL "Static option" FORCE)
+  set(SPARSE_SHARED OFF CACHE BOOL "Shared option" FORCE)
 endif()
 
-# Check compiler architecture
-if(CMAKE_CL_64)
-    MESSAGE( STATUS "64-bit")
+if(NOT SPARSE_STATIC AND SPARSE_SHARED)
+  set(SPARSE_BUILD SHARED)
+else(SPARSE_STATIC)
+  set(SPARSE_BUILD STATIC)
+endif()
+
+if(SPARSE_USE_C99)
+  set(CMAKE_C_STANDARD 99)
+endif()
+
+if(MSVC)
+  add_definitions(-DNDEBUG -D_WINDOWS -D_USRDLL)
+  add_compile_options(/W3 /Ox /Gy /Oi /TC)
+  
+  # Ref: https://skia.googlesource.com/third_party/sdl/+/refs/heads/master/CMakeLists.txt#225
+  # Make sure /RTC1 is disabled, otherwise it will use functions from the CRT
+  foreach(flag_var
+      CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
+      CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO)
+    string(REGEX REPLACE "/RTC(su|[1su])" "" ${flag_var} "${${flag_var}}")
+  endforeach(flag_var)
 else()
-    MESSAGE( STATUS "32-bit")
+    add_compile_options(-Wall -O3 )#-Werror)
 endif()
 
-# Check compilers
-MESSAGE( STATUS ">>>>>>>> ${CMAKE_C_COMPILER_ID}")
-if (CMAKE_C_COMPILER_ID STREQUAL "Clang")
-    MESSAGE( STATUS "Using Clang" )
-elseif (CMAKE_C_COMPILER_ID STREQUAL "GNU")
-    MESSAGE( STATUS "Using GNU" )
-elseif (CMAKE_C_COMPILER_ID STREQUAL "MSVC")
-    MESSAGE( STATUS "Using MSVC" )
+get_directory_property(SparseParentDir PARENT_DIRECTORY)
+
+if(NOT SparseParentDir AND NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "Setting build type to '${DEFAULT_BUILD_TYPE}' as none was specified.")
+  set(CMAKE_BUILD_TYPE "${DEFAULT_BUILD_TYPE}" CACHE STRING "Choose the type of build." FORCE)
+  # Set the possible values of build type for cmake-gui
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
+include(GNUInstallDirs)
+
+set(CPACK_PROJECT_NAME ${PROJECT_NAME})
+set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
+
+if(NOT CPack_CMake_INCLUDED)
+  include(CPack)
+endif()
+
+# Target Start
 set(
     SOURCES
     inc/spConfig.h
@@ -43,29 +79,53 @@ set(
     src/spUtils.c
     )
 
-add_library(${PROJECT_NAME} STATIC ${SOURCES})
+add_library(${PROJECT_NAME}
+    ${SPARSE_BUILD}
+    ${SOURCES})
 
-target_include_directories(sparse PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(sparse PUBLIC ${PROJECT_INCLUDE_DIRS})
+if(SPARSE_SHARED)
+    add_definitions(-DSPARSE_EXPORTS)
+else()
+    target_compile_definitions(${PROJECT_NAME} PUBLIC -DSPARSE_STATIC)
+endif()
+
+set_target_properties(${PROJECT_NAME} PROPERTIES
+                           VERSION ${PROJECT_VERSION}
+                           SOVERSION ${PROJECT_VERSION_MAJOR})
+
+if(WIN32)
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        RUNTIME_OUTPUT_NAME ${PROJECT_NAME}-${PROJECT_VERSION_MAJOR})
+endif()
+
+#target_include_directories(${PROJECT_NAME}
+#    PUBLIC
+#    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
+#    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+
+#    PUBLIC
+#    ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+## Target for header-only usage
+#add_library(${PROJECT_NAME}_headers INTERFACE)
+#target_include_directories(${PROJECT_NAME}_headers INTERFACE ${PROJECT_INCLUDE_DIRS})
+
+target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_INCLUDE_DIRS})
+
+# Test Configuration
+if(SPARSE_USE_TEST)
+    include(CTest)
+    enable_testing()
+    add_subdirectory(test)
+endif()
 
 # Set installation directory
 install(TARGETS ${PROJECT_NAME}
-        EXPORT ${TARGETS_EXPORT_NAME}
-        LIBRARY DESTINATION ${PROJECT_SOURCE_DIR}/lib)
+        EXPORT ${PROJECT_NAME}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-#if(WINDOWS)
-#    install (DIRECTORY  "${PROJECT_SOURCE_DIR}/platforms/win/bin/" DESTINATION ${PROJECT_SOURCE_DIR}/dist)
-#elseif(LINUX)
-#    if (CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
-#        install (DIRECTORY  "${PROJECT_SOURCE_DIR}/platforms/linux/" DESTINATION ${PROJECT_SOURCE_DIR}/dist)
-#    elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL armv7l OR ARM32_BUILD)
-#        install (DIRECTORY  "${PROJECT_SOURCE_DIR}/platforms/arm32/" DESTINATION ${PROJECT_SOURCE_DIR}/dist)
-#    elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL aarch64)
-#        install (DIRECTORY  "${PROJECT_SOURCE_DIR}/platforms/aarch64/" DESTINATION ${PROJECT_SOURCE_DIR}/dist)
-#    endif()
-#elseif(MACOS)
-#    install (DIRECTORY  "${PROJECT_SOURCE_DIR}/platforms/macos/" DESTINATION ${PROJECT_SOURCE_DIR}/dist)
-#endif()
-
-#add_executable(${PROJECT_NAME} main.c)
-#target_link_libraries(${PROJECT_NAME} )
+install(DIRECTORY lib DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        PATTERN ".*" EXCLUDE)

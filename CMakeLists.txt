@@ -98,20 +98,20 @@ if(WIN32)
         RUNTIME_OUTPUT_NAME ${PROJECT_NAME}-${PROJECT_VERSION_MAJOR})
 endif()
 
-#target_include_directories(${PROJECT_NAME}
-#    PUBLIC
-#    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
-#    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+target_include_directories(${PROJECT_NAME}
+    PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 
-#    PUBLIC
-#    ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 ## Target for header-only usage
-#add_library(${PROJECT_NAME}_headers INTERFACE)
-#target_include_directories(${PROJECT_NAME}_headers INTERFACE ${PROJECT_INCLUDE_DIRS})
+add_library(${PROJECT_NAME}_headers INTERFACE)
+target_include_directories(${PROJECT_NAME}_headers INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/inc)
 
-target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_INCLUDE_DIRS})
+#target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+#target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_INCLUDE_DIRS})
 
 # Test Configuration
 if(SPARSE_USE_TEST)
@@ -129,3 +129,33 @@ install(TARGETS ${PROJECT_NAME}
 
 install(DIRECTORY lib DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         PATTERN ".*" EXCLUDE)
+
+# Config
+#export(TARGETS ${PROJECT_NAME}
+#    NAMESPACE ${PROJECT_NAME}::
+#    FILE "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+#    )
+
+#install(EXPORT ${PROJECT_NAME}
+#    FILE "${PROJECT_NAME}Config.cmake"
+#    NAMESPACE ${PROJECT_NAME}::
+#    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
+
+#set(PACKAGE_NAME ${PROJECT_NAME})
+#set(prefix ${CMAKE_INSTALL_PREFIX})
+#set(exec_prefix ${CMAKE_INSTALL_PREFIX})
+#if (IS_ABSOLUTE "${CMAKE_INSTALL_INCLUDEDIR}")
+#    set(includedir "${CMAKE_INSTALL_INCLUDEDIR}")
+#else()
+#    set(includedir "\${prefix}/${CMAKE_INSTALL_INCLUDEDIR}")
+#endif()
+#if (IS_ABSOLUTE "${CMAKE_INSTALL_LIBDIR}")
+#    set(libdir "${CMAKE_INSTALL_LIBDIR}")
+#else()
+#    set(libdir "\${exec_prefix}/${CMAKE_INSTALL_LIBDIR}")
+#endif()
+#set(PACKAGE_VERSION "${PROJECT_VERSION}")
+#configure_file(sparse.pc.in sparse.pc @ONLY)
+
+#install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sparse.pc
+#    DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)

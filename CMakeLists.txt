@@ -72,10 +72,8 @@ set(
     src/spAllocate.c
     src/spBuild.c
     src/spFactor.c
-    src/spFortran.c
     src/spOutput.c
     src/spSolve.c
-    src/spTest.c
     src/spUtils.c
     )
 

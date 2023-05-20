@@ -115,10 +115,6 @@ void MemoryDeallocate(MatrixPtr, int*);
 
 char* spCreate(int Size, BOOLEAN Complex, int* pError )
 {
-    unsigned  SizePlusOne;
-    MatrixPtr  Matrix;
-    int I, AllocatedSize;
-
     /* Begin `spCreate'. */
     /* Clear error flag. */
     *pError = spOKAY;
@@ -144,8 +140,9 @@ char* spCreate(int Size, BOOLEAN Complex, int* pError )
 #endif
 
     /* Create Matrix. */
-    AllocatedSize = MAX( Size, MINIMUM_ALLOCATED_SIZE );
-    SizePlusOne = (unsigned)(AllocatedSize + 1);
+    int AllocatedSize = MAX( Size, MINIMUM_ALLOCATED_SIZE );
+    unsigned SizePlusOne = (unsigned)(AllocatedSize + 1);
+    MatrixPtr Matrix = NULL;
 
     if ((Matrix = ALLOC(struct MatrixFrame, 1)) == NULL)
     {   *pError = spNO_MEMORY;
@@ -250,9 +247,9 @@ char* spCreate(int Size, BOOLEAN Complex, int* pError )
     }
 
 /* Initialize MapIntToExt vectors. */
-    for (I = 1; I <= AllocatedSize; I++)
-    {   Matrix->IntToExtRowMap[I] = I;
-        Matrix->IntToExtColMap[I] = I;
+    for (int i = 1; i <= AllocatedSize; i++)
+    {   Matrix->IntToExtRowMap[i] = i;
+        Matrix->IntToExtColMap[i] = i;
     }
 
 #if TRANSLATE
@@ -271,9 +268,9 @@ char* spCreate(int Size, BOOLEAN Complex, int* pError )
     }
 
 /* Initialize MapExtToInt vectors. */
-    for (I = 1; I <= AllocatedSize; I++)
-    {   Matrix->ExtToIntColMap[I] = -1;
-        Matrix->ExtToIntRowMap[I] = -1;
+    for (int i = 1; i <= AllocatedSize; i++)
+    {   Matrix->ExtToIntColMap[i] = -1;
+        Matrix->ExtToIntRowMap[i] = -1;
     }
     Matrix->ExtToIntColMap[0] = 0;
     Matrix->ExtToIntRowMap[0] = 0;
@@ -417,8 +414,8 @@ int InitializeElementBlocks(MatrixPtr Matrix, int  InitialNumberOfElements,
 
 ElementPtr spcGetFillin(MatrixPtr Matrix)
 {
-    struct FillinListNodeStruct *pListNode;
-    ElementPtr  pFillins;
+    //struct FillinListNodeStruct *pListNode;
+    //ElementPtr  pFillins;
 
     /* Begin `spcGetFillin'. */
     if (Matrix->FillinsRemaining == 0)
@@ -496,7 +493,6 @@ int RecordAllocation(MatrixPtr Matrix, char* AllocatedPtr)
 /*static*/
 int AllocateBlockOfAllocationList(MatrixPtr Matrix)
 {
-    int  I;
     AllocationListPtr  ListPtr;
 
     /* Begin `AllocateBlockOfAllocationList'. */
@@ -513,7 +509,7 @@ int AllocateBlockOfAllocationList(MatrixPtr Matrix)
     ListPtr->NextRecord = Matrix->TopOfAllocationList;
     Matrix->TopOfAllocationList = ListPtr;
     ListPtr += ELEMENTS_PER_ALLOCATION;
-    for (I = ELEMENTS_PER_ALLOCATION; I > 0; I--)
+    for (int i = ELEMENTS_PER_ALLOCATION; i > 0; i--)
     {    ListPtr->NextRecord = ListPtr - 1;
          ListPtr--;
     }

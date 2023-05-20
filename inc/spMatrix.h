@@ -273,6 +273,7 @@ extern  void     spDeterminant ( char*, int*, spREAL*, spREAL* );
 #else /* NOT spCOMPLEX */
 extern  void     spDeterminant ( char*, int*, spREAL* );
 #endif /* NOT spCOMPLEX */
+
 #if spCOMPLEX && spSEPARATED_COMPLEX_VECTORS
 extern  int      spFileVector( char*, char* , spREAL[], spREAL[]);
 extern  void     spMultiply( char*, spREAL[], spREAL[], spREAL[], spREAL[] );
@@ -289,46 +290,46 @@ extern  void     spSolveTransposed( char*, spREAL[], spREAL[] );
 
 #else /* NOT defined(__STDC__) */
 
-/* For compilers that do not understand function prototypes. */
+///* For compilers that do not understand function prototypes. */
 
-extern  void     spClear();
-extern  spREAL   spCondition();
-extern  char    *spCreate();
-extern  void     spDeleteRowAndCol();
-extern  void     spDestroy();
-extern  void     spDeterminant ();
-extern  int      spElementCount();
-extern  int      spError();
-extern  int      spFactor();
-extern  int      spFileMatrix();
-extern  int      spFileStats();
-extern  int      spFileVector();
-extern  int      spFillinCount();
-extern  int      spGetAdmittance();
-extern  spREAL  *spGetElement();
-extern  char    *spGetInitInfo();
-extern  int      spGetOnes();
-extern  int      spGetQuad();
-extern  int      spGetSize();
-extern  int      spInitialize();
-extern  void     spInstallInitInfo();
-extern  spREAL   spLargestElement();
-extern  void     spMNA_Preorder();
-extern  void     spMultiply();
-extern  void     spMultTransposed();
-extern  spREAL   spNorm();
-extern  int      spOrderAndFactor();
-extern  void     spPartition();
-extern  void     spPrint();
-extern  spREAL   spPseudoCondition();
-extern  spREAL   spRoundoff();
-extern  void     spScale();
-extern  void     spSetComplex();
-extern  void     spSetReal();
-extern  void     spSolve();
-extern  void     spSolveTransposed();
-extern  void     spStripFills();
-extern  void     spWhereSingular();
+//extern  void     spClear();
+//extern  spREAL   spCondition();
+//extern  char    *spCreate();
+//extern  void     spDeleteRowAndCol();
+//extern  void     spDestroy();
+//extern  void     spDeterminant ();
+//extern  int      spElementCount();
+//extern  int      spError();
+//extern  int      spFactor();
+//extern  int      spFileMatrix();
+//extern  int      spFileStats();
+//extern  int      spFileVector();
+//extern  int      spFillinCount();
+//extern  int      spGetAdmittance();
+//extern  spREAL  *spGetElement();
+//extern  char    *spGetInitInfo();
+//extern  int      spGetOnes();
+//extern  int      spGetQuad();
+//extern  int      spGetSize();
+//extern  int      spInitialize();
+//extern  void     spInstallInitInfo();
+//extern  spREAL   spLargestElement();
+//extern  void     spMNA_Preorder();
+//extern  void     spMultiply();
+//extern  void     spMultTransposed();
+//extern  spREAL   spNorm();
+//extern  int      spOrderAndFactor();
+//extern  void     spPartition();
+//extern  void     spPrint();
+//extern  spREAL   spPseudoCondition();
+//extern  spREAL   spRoundoff();
+//extern  void     spScale();
+//extern  void     spSetComplex();
+//extern  void     spSetReal();
+//extern  void     spSolve();
+//extern  void     spSolveTransposed();
+//extern  void     spStripFills();
+//extern  void     spWhereSingular();
 #endif /* defined(__STDC__) */
 
 #endif  /* spOKAY */

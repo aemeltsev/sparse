@@ -91,7 +91,7 @@ ElementPtr spcFindElementInCol(MatrixPtr Matrix, ElementPtr *LastAddr, int Row, 
 void spClear(char *eMatrix)
 {
     MatrixPtr Matrix = (MatrixPtr)eMatrix;
-    ElementPtr pElement;
+    ElementPtr pElement = NULL;
 
 /* Begin `spClear'. */
     ASSERT( IS_SPARSE( Matrix ) );
@@ -176,7 +176,7 @@ void spClear(char *eMatrix)
 RealNumber* spGetElement(char *eMatrix, int Row, int Col)
 {
     MatrixPtr Matrix = (MatrixPtr)eMatrix;
-    RealNumber *pElement;
+    RealNumber *pElement = NULL;
 
     /* Begin `spGetElement'. */
     ASSERT( IS_SPARSE( Matrix ) AND Row >= 0 AND Col >= 0 );

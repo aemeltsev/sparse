@@ -1622,7 +1622,8 @@ void MarkowitzProducts(MatrixPtr Matrix, int Step)
     int I, J;
     long MinMarkowitzProduct, *pMarkowitzProduct;
     ElementPtr pDiag;
-    int NumberOfTies, Size = Matrix->Size;
+    int NumberOfTies = 0;
+    int Size = Matrix->Size;
     ElementPtr ChosenPivot;
     RealNumber Magnitude, Ratio, RatioOfAccepted, LargestInCol;
 

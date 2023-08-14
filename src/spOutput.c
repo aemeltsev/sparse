@@ -4,11 +4,19 @@
  *  Author:                     Advisor:
  *      Kenneth S. Kundert          Alberto Sangiovanni-Vincentelli
  *      UC Berkeley
- *
+ */
+/*! \file
+ * 
  *  This file contains the output-to-file and output-to-screen routines for
  *  the matrix package.
  *
- *  >>> User accessible functions contained in this file:
+ *  Objects that begin with the \a spc prefix are considered private
+ *  and should not be used.
+ *
+ *  \author
+ *  Kenneth S. Kundert <kundert@users.sourceforge.net>
+ */
+/*  >>> User accessible functions contained in this file:
  *  spPrint
  *  spFileMatrix
  *  spFileVector
@@ -21,24 +29,15 @@
 /*
  *  Revision and copyright information.
  *
- *  Copyright (c) 1985,86,87,88
- *  by Kenneth S. Kundert and the University of California.
- *
- *  Permission to use, copy, modify, and distribute this software and
- *  its documentation for any purpose and without fee is hereby granted,
- *  provided that the copyright notices appear in all copies and
- *  supporting documentation and that the authors and the University of
- *  California are properly credited.  The authors and the University of
- *  California make no representations as to the suitability of this
- *  software for any purpose.  It is provided `as is', without express
- *  or implied warranty.
+ *  Copyright (c) 1985-2003
+ *  by Kenneth S. Kundert
  */
 
 #ifndef lint
 static char copyright[] =
-    "Sparse1.3: Copyright (c) 1985,86,87,88 by Kenneth S. Kundert";
+    "Sparse1.4: Copyright (c) 1985-2003 by Kenneth S. Kundert";
 static char RCSid[] =
-    "$Header: /local/cvs/freeda/libs/sparse/spOutput.c,v 1.1.1.1 2004/02/25 18:15:35 nmkripla Exp $";
+    "$Header: /cvsroot/sparse/src/spOutput.c,v 1.3 2003/06/29 04:19:52 kundert Exp $";
 #endif
 
 
@@ -57,40 +56,42 @@ static char RCSid[] =
  */
 
 #define spINSIDE_SPARSE
-#include "inc/spConfig.h"
-#include "inc/spMatrix.h"
-#include "inc/spDefs.h"
+#include <stdio.h>
+#include "spConfig.h"
+#include "spMatrix.h"
+#include "spDefs.h"
+
+
+
+
 
 #if DOCUMENTATION
-
-/*
- *  PRINT MATRIX
- *
+
+/*!
  *  Formats and send the matrix to standard output.  Some elementary
  *  statistics are also output.  The matrix is output in a format that is
  *  readable by people.
  *
- *  >>> Arguments:
- *  Matrix  <input>  (char *)
+ *  \param eMatrix
  *      Pointer to matrix.
- *  PrintReordered  <input>  (int)
+ *  \param PrintReordered
  *      Indicates whether the matrix should be printed out in its original
  *      form, as input by the user, or whether it should be printed in its
  *      reordered form, as used by the matrix routines.  A zero indicates that
  *      the matrix should be printed as inputed, a one indicates that it
  *      should be printed reordered.
- *  Data  <input>  (int)
+ *  \param Data
  *      Boolean flag that when false indicates that output should be
  *      compressed such that only the existence of an element should be
  *      indicated rather than giving the actual value.  Thus 11 times as
  *      many can be printed on a row.  A zero signifies that the matrix
  *      should be printed compressed. A one indicates that the matrix
  *      should be printed in all its glory.
- *  Header  <input>  (int)
+ *  \param Header
  *      Flag indicating that extra information should be given, such as row
  *      and column numbers.
- *
- *  >>> Local variables:
+ */
+/*  >>> Local variables:
  *  Col  (int)
  *      Column being printed.
  *  ElementCount  (int)
@@ -133,18 +134,24 @@ static char RCSid[] =
  *      The largest expected external row or column number.
  */
 
-void spPrint(char* eMatrix, int PrintReordered, int Data, int Header)
+void
+spPrint(
+    spMatrix eMatrix,
+    int PrintReordered,
+    int Data,
+    int Header
+)
 {
-    MatrixPtr  Matrix = (MatrixPtr)eMatrix;
-    int J = 0;
-    int I, Row, Col, Size, Top, StartCol = 1, StopCol, Columns, ElementCount = 0;
-    double Magnitude, SmallestDiag, SmallestElement;
-    double LargestElement = 0.0, LargestDiag = 0.0;
-    ElementPtr pElement, pImagElements[PRINTER_WIDTH/10+1];
-    int* PrintOrdToIntRowMap, *PrintOrdToIntColMap;
+MatrixPtr  Matrix = (MatrixPtr)eMatrix;
+register  int  J = 0;
+int I, Row, Col, Size, Top, StartCol = 1, StopCol, Columns, ElementCount = 0;
+double  Magnitude, SmallestDiag, SmallestElement;
+double  LargestElement = 0.0, LargestDiag = 0.0;
+ElementPtr  pElement, pImagElements[PRINTER_WIDTH/10+1];
+int  *PrintOrdToIntRowMap, *PrintOrdToIntColMap;
 
-    /* Begin `spPrint'. */
-    ASSERT( IS_SPARSE( Matrix ) );
+/* Begin `spPrint'. */
+    ASSERT_IS_SPARSE( Matrix );
     Size = Matrix->Size;
 
 /* Create a packed external to internal row and column translation array. */
@@ -156,33 +163,28 @@ void spPrint(char* eMatrix, int PrintReordered, int Data, int Header)
     CALLOC( PrintOrdToIntRowMap, int, Top + 1 );
     CALLOC( PrintOrdToIntColMap, int, Top + 1 );
     if ( PrintOrdToIntRowMap == NULL OR PrintOrdToIntColMap == NULL)
-    {
-        Matrix->Error = spNO_MEMORY;
+    {   Matrix->Error = spNO_MEMORY;
         return;
     }
     for (I = 1; I <= Size; I++)
-    {
-        PrintOrdToIntRowMap[ Matrix->IntToExtRowMap[I] ] = I;
+    {   PrintOrdToIntRowMap[ Matrix->IntToExtRowMap[I] ] = I;
         PrintOrdToIntColMap[ Matrix->IntToExtColMap[I] ] = I;
     }
 
-    /* Pack the arrays. */
+/* Pack the arrays. */
     for (J = 1, I = 1; I <= Top; I++)
-    {
-        if (PrintOrdToIntRowMap[I] != 0)
+    {   if (PrintOrdToIntRowMap[I] != 0)
             PrintOrdToIntRowMap[ J++ ] = PrintOrdToIntRowMap[ I ];
     }
     for (J = 1, I = 1; I <= Top; I++)
-    {
-        if (PrintOrdToIntColMap[I] != 0)
+    {   if (PrintOrdToIntColMap[I] != 0)
             PrintOrdToIntColMap[ J++ ] = PrintOrdToIntColMap[ I ];
     }
 
-    /* Print header. */
+/* Print header. */
     if (Header)
-    {
-        printf("MATRIX SUMMARY\n\n");
-        printf("Size of matrix = %1u x %1u.\n", Size, Size);
+    {   printf("MATRIX SUMMARY\n\n");
+        printf("Size of matrix = %1d x %1d.\n", Size, Size);
         if ( Matrix->Reordered AND PrintReordered )
             printf("Matrix has been reordered.\n");
         putchar('\n');
@@ -195,33 +197,31 @@ void spPrint(char* eMatrix, int PrintReordered, int Data, int Header)
         SmallestElement = LARGEST_REAL;
         SmallestDiag = SmallestElement;
     }
+    if (Size == 0) return;
 
-    /* Determine how many columns to use. */
+/* Determine how many columns to use. */
     Columns = PRINTER_WIDTH;
     if (Header) Columns -= 5;
     if (Data) Columns = (Columns+1) / 10;
 
-    /*
+/*
  * Print matrix by printing groups of complete columns until all the columns
  * are printed.
  */
     J = 0;
     while ( J <= Size )
-    /* Calculate index of last column to printed in this group. */
-    {
-        StopCol = StartCol + Columns - 1;
+
+/* Calculate index of last column to printed in this group. */
+    {   StopCol = StartCol + Columns - 1;
         if (StopCol > Size)
             StopCol = Size;
 
-        /* Label the columns. */
+/* Label the columns. */
         if (Header)
-        {
-            if (Data)
+        {   if (Data)
             {   printf("    ");
-
                 for (I = StartCol; I <= StopCol; I++)
-                {
-                    if (PrintReordered)
+                {   if (PrintReordered)
                         Col = I;
                     else
                         Col = PrintOrdToIntColMap[I];
@@ -230,38 +230,34 @@ void spPrint(char* eMatrix, int PrintReordered, int Data, int Header)
                 printf("\n\n");
             }
             else
-            {
-                if (PrintReordered)
+            {   if (PrintReordered)
                     printf("Columns %1d to %1d.\n",StartCol,StopCol);
                 else
                 {   printf("Columns %1d to %1d.\n",
-                           Matrix->IntToExtColMap[ PrintOrdToIntColMap[StartCol] ],
-                           Matrix->IntToExtColMap[ PrintOrdToIntColMap[StopCol] ]);
+                        Matrix->IntToExtColMap[ PrintOrdToIntColMap[StartCol] ],
+                        Matrix->IntToExtColMap[ PrintOrdToIntColMap[StopCol] ]);
                 }
             }
         }
 
-        /* Print every row ...  */
+/* Print every row ...  */
         for (I = 1; I <= Size; I++)
-        {
-            if (PrintReordered)
+        {   if (PrintReordered)
                 Row = I;
             else
                 Row = PrintOrdToIntRowMap[I];
 
             if (Header)
-            {
-                if (PrintReordered AND NOT Data)
+            {   if (PrintReordered AND NOT Data)
                     printf("%4d", I);
                 else
                     printf("%4d", Matrix->IntToExtRowMap[ Row ]);
                 if (NOT Data) putchar(' ');
             }
 
-            /* ... in each column of the group. */
+/* ... in each column of the group. */
             for (J = StartCol; J <= StopCol; J++)
-            {
-                if (PrintReordered)
+            {   if (PrintReordered)
                     Col = J;
                 else
                     Col = PrintOrdToIntColMap[J];
@@ -275,13 +271,13 @@ void spPrint(char* eMatrix, int PrintReordered, int Data, int Header)
 
                 if (pElement != NULL)
 
-                /* Case where element exists */
+/* Case where element exists */
                 {   if (Data)
-                        printf(" %9.3lg", (double)pElement->Real);
+                        printf(" %9.3g", (double)pElement->Real);
                     else
                         putchar('x');
 
-                    /* Update status variables */
+/* Update status variables */
                     if ( (Magnitude = ELEMENT_MAG(pElement)) > LargestElement )
                         LargestElement = Magnitude;
                     if ((Magnitude < SmallestElement) AND (Magnitude != 0.0))
@@ -289,10 +285,9 @@ void spPrint(char* eMatrix, int PrintReordered, int Data, int Header)
                     ElementCount++;
                 }
 
-                /* Case where element is structurally zero */
+/* Case where element is structurally zero */
                 else
-                {
-                    if (Data)
+                {   if (Data)
                         printf("       ...");
                     else
                         putchar('.');
@@ -302,12 +297,11 @@ void spPrint(char* eMatrix, int PrintReordered, int Data, int Header)
 
 #if spCOMPLEX
             if (Matrix->Complex AND Data)
-            {
-                printf("    ");
+            {   if (Header)
+		    printf("    ");
                 for (J = StartCol; J <= StopCol; J++)
-                {
-                    if (pImagElements[J - StartCol] != NULL)
-                    {   printf(" %8.2lgj",
+                {   if (pImagElements[J - StartCol] != NULL)
+                    {   printf(" %8.2gj",
                                (double)pImagElements[J-StartCol]->Imag);
                     }
                     else printf("          ");
@@ -317,42 +311,37 @@ void spPrint(char* eMatrix, int PrintReordered, int Data, int Header)
 #endif /* spCOMPLEX */
         }
 
-        /* Calculate index of first column in next group. */
+/* Calculate index of first column in next group. */
         StartCol = StopCol;
         StartCol++;
         putchar('\n');
     }
     if (Header)
-    {
-        printf("\nLargest element in matrix = %-1.4lg.\n", LargestElement);
-        printf("Smallest element in matrix = %-1.4lg.\n", SmallestElement);
+    {   printf("\nLargest element in matrix = %-1.4g.\n", LargestElement);
+        printf("Smallest element in matrix = %-1.4g.\n", SmallestElement);
 
-        /* Search for largest and smallest diagonal values */
+/* Search for largest and smallest diagonal values */
         for (I = 1; I <= Size; I++)
-        {
-            if (Matrix->Diag[I] != NULL)
-            {
-                Magnitude = ELEMENT_MAG( Matrix->Diag[I] );
+        {   if (Matrix->Diag[I] != NULL)
+            {   Magnitude = ELEMENT_MAG( Matrix->Diag[I] );
                 if ( Magnitude > LargestDiag ) LargestDiag = Magnitude;
                 if ( Magnitude < SmallestDiag ) SmallestDiag = Magnitude;
             }
         }
 
-        /* Print the largest and smallest diagonal values */
+    /* Print the largest and smallest diagonal values */
         if ( Matrix->Factored )
-        {
-            printf("\nLargest diagonal element = %-1.4lg.\n", LargestDiag);
-            printf("Smallest diagonal element = %-1.4lg.\n", SmallestDiag);
+        {   printf("\nLargest diagonal element = %-1.4g.\n", LargestDiag);
+            printf("Smallest diagonal element = %-1.4g.\n", SmallestDiag);
         }
         else
-        {
-            printf("\nLargest pivot element = %-1.4lg.\n", LargestDiag);
-            printf("Smallest pivot element = %-1.4lg.\n", SmallestDiag);
+        {   printf("\nLargest pivot element = %-1.4g.\n", LargestDiag);
+            printf("Smallest pivot element = %-1.4g.\n", SmallestDiag);
         }
 
-        /* Calculate and print sparsity and number of fill-ins created. */
-        printf("\nDensity = %2.2lf%%.\n", ((double)(ElementCount * 100)) /
-                                              ((double)(Size * Size)));
+    /* Calculate and print sparsity and number of fill-ins created. */
+	printf("\nDensity = %2.2f%%.\n", ((double)ElementCount * 100.0)
+					 / (((double)Size * (double)Size)));
         if (NOT Matrix->NeedsOrdering)
             printf("Number of fill-ins = %1d.\n", Matrix->Fillins);
     }
@@ -361,84 +350,104 @@ void spPrint(char* eMatrix, int PrintReordered, int Data, int Header)
 
     FREE(PrintOrdToIntColMap);
     FREE(PrintOrdToIntRowMap);
+    return;
 }
 
-/**
- * @brief spFileMatrix - OUTPUT MATRIX TO FILE
- *        Writes matrix to file in format suitable to be read back in by the matrix test program.
- * @param eMatrix - (char *)
- *        Pointer to matrix.
- * @param Label - (char *)
- *        String that is transferred to file and is used as a label.
- * @param File - (char *)
- *        Name of file into which matrix is to be written.
- * @param Reordered - (BOOLEAN)
- *        Specifies whether matrix should be output in reordered form,
- *        or in original order.
- * @param Data - (BOOLEAN)
- *        Indicates that the element values should be output along with
- *        the indices for each element.  This parameter must be true if
- *        matrix is to be read by the sparse test program.
- * @param Header - (BOOLEAN)
- *        Indicates that header is desired. This parameter must be true if
- *        matrix is to be read by the sparse test program.
- * @return One is returned if routine was successful, otherwise zero is returned.
- *         The calling function can query errno (the system global error variable)
- *         as to the reason why this routine failed.
- * @def Col - (int)
+
+
+
+
+
+
+
+
+
+
+/*!
+ *  Writes matrix to file in format suitable to be read back in by the
+ *  matrix test program.
+ *
+ *  \return
+ *  One is returned if routine was successful, otherwise zero is returned.
+ *  The calling function can query \a errno (the system global error variable)
+ *  as to the reason why this routine failed.
+ *
+ *  \param eMatrix
+ *      Pointer to matrix.
+ *  \param File
+ *      Name of file into which matrix is to be written.
+ *  \param Label
+ *      String that is transferred to file and is used as a label.
+ *  \param Reordered
+ *      Specifies whether matrix should be output in reordered form,
+ *      or in original order.
+ *  \param Data
+ *      Indicates that the element values should be output along with
+ *      the indices for each element.  This parameter must be true if
+ *      matrix is to be read by the sparse test program.
+ *  \param Header
+ *      Indicates that header is desired.  This parameter must be true if
+ *      matrix is to be read by the sparse test program.
+ */
+/*  >>> Local variables:
+ *  Col  (int)
  *      The original column number of the element being output.
- * @def pElement - (ElementPtr)
+ *  pElement  (ElementPtr)
  *      Pointer to an element in the matrix.
- * @def pMatrixFile - (FILE *)
+ *  pMatrixFile  (FILE *)
  *      File pointer to the matrix file.
- * @def Row - (int)
+ *  Row  (int)
  *      The original row number of the element being output.
- * @def Size - (int)
+ *  Size  (int)
  *      The size of the matrix.
  */
-int spFileMatrix(char* eMatrix, char* Label, char* File,
-                 int Reordered, int Data, int Header)
+
+int
+spFileMatrix(
+    spMatrix eMatrix,
+    char *File,
+    char *Label,
+    int Reordered,
+    int Data,
+    int Header
+)
 {
-    MatrixPtr Matrix = (MatrixPtr)eMatrix;
-    int I, Size;
-    ElementPtr pElement;
-    int Row, Col, Err = 0;
-    FILE* pMatrixFile;
+MatrixPtr  Matrix = (MatrixPtr)eMatrix;
+register  int  I, Size;
+register  ElementPtr  pElement;
+int  Row, Col, Err;
+FILE  *pMatrixFile;
 
-    /* Begin `spFileMatrix'. */
-    ASSERT( IS_SPARSE( Matrix ) );
+/* Begin `spFileMatrix'. */
+    ASSERT_IS_SPARSE( Matrix );
 
-    /* Open file matrix file in write mode. */
+/* Open file matrix file in write mode. */
     if ((pMatrixFile = fopen(File, "w")) == NULL)
         return 0;
 
-    /* Output header. */
+/* Output header. */
     Size = Matrix->Size;
     if (Header)
-    {
-        if (Matrix->Factored AND Data)
-        {
-            Err = fprintf
-                ( pMatrixFile,
-                 "Warning : The following matrix is factored in to LU form.\n"
-                 );
+    {   if (Matrix->Factored AND Data)
+        {   Err = fprintf
+            (   pMatrixFile,
+                "Warning : The following matrix is factored in to LU form.\n"
+            );
+	    if (Err < 0) return 0;
         }
-        if (Err < 0) return 0;
         if (fprintf(pMatrixFile, "%s\n", Label) < 0) return 0;
         Err = fprintf( pMatrixFile, "%d\t%s\n", Size,
-                      (Matrix->Complex ? "complex" : "real"));
+                                    (Matrix->Complex ? "complex" : "real"));
         if (Err < 0) return 0;
     }
+    if (Size == 0) return 1;
 
-    /* Output matrix. */
+/* Output matrix. */
     if (NOT Data)
-    {
-        for (I = 1; I <= Size; I++)
-        {
-            pElement = Matrix->FirstInCol[I];
+    {   for (I = 1; I <= Size; I++)
+        {   pElement = Matrix->FirstInCol[I];
             while (pElement != NULL)
-            {
-                if (Reordered)
+            {   if (Reordered)
                 {   Row = pElement->Row;
                     Col = I;
                 }
@@ -450,20 +459,17 @@ int spFileMatrix(char* eMatrix, char* Label, char* File,
                 if (fprintf(pMatrixFile, "%d\t%d\n", Row, Col) < 0) return 0;
             }
         }
-        /* Output terminator, a line of zeros. */
+/* Output terminator, a line of zeros. */
         if (Header)
             if (fprintf(pMatrixFile, "0\t0\n") < 0) return 0;
     }
 
 #if spCOMPLEX
     if (Data AND Matrix->Complex)
-    {
-        for (I = 1; I <= Size; I++)
+    {   for (I = 1; I <= Size; I++)
         {   pElement = Matrix->FirstInCol[I];
-
             while (pElement != NULL)
-            {
-                if (Reordered)
+            {   if (Reordered)
                 {   Row = pElement->Row;
                     Col = I;
                 }
@@ -472,14 +478,14 @@ int spFileMatrix(char* eMatrix, char* Label, char* File,
                     Col = Matrix->IntToExtColMap[I];
                 }
                 Err = fprintf
-                    (pMatrixFile,"%d\t%d\t%-.15lg\t%-.15lg\n",
-                     Row, Col, (double)pElement->Real, (double)pElement->Imag
-                     );
+                (   pMatrixFile,"%d\t%d\t%-.15g\t%-.15g\n",
+                    Row, Col, (double)pElement->Real, (double)pElement->Imag
+                );
                 if (Err < 0) return 0;
                 pElement = pElement->NextInCol;
             }
         }
-        /* Output terminator, a line of zeros. */
+/* Output terminator, a line of zeros. */
         if (Header)
             if (fprintf(pMatrixFile,"0\t0\t0.0\t0.0\n") < 0) return 0;
 
@@ -488,84 +494,87 @@ int spFileMatrix(char* eMatrix, char* Label, char* File,
 
 #if REAL
     if (Data AND NOT Matrix->Complex)
-    {
-        for (I = 1; I <= Size; I++)
-        {
-            pElement = Matrix->FirstInCol[I];
+    {   for (I = 1; I <= Size; I++)
+        {   pElement = Matrix->FirstInCol[I];
             while (pElement != NULL)
-            {
-                Row = Matrix->IntToExtRowMap[pElement->Row];
+            {   Row = Matrix->IntToExtRowMap[pElement->Row];
                 Col = Matrix->IntToExtColMap[I];
                 Err = fprintf
-                    (pMatrixFile,"%d\t%d\t%-.15lg\n",
-                     Row, Col, (double)pElement->Real
-                     );
+                (   pMatrixFile,"%d\t%d\t%-.15g\n",
+                    Row, Col, (double)pElement->Real
+                );
                 if (Err < 0) return 0;
                 pElement = pElement->NextInCol;
             }
         }
-        /* Output terminator, a line of zeros. */
+/* Output terminator, a line of zeros. */
         if (Header)
             if (fprintf(pMatrixFile,"0\t0\t0.0\n") < 0) return 0;
 
     }
 #endif /* REAL */
 
-    /* Close file. */
+/* Close file. */
     if (fclose(pMatrixFile) < 0) return 0;
     return 1;
 }
 
-/*
- *  OUTPUT SOURCE VECTOR TO FILE
- *
+
+
+
+
+
+
+/*!
  *  Writes vector to file in format suitable to be read back in by the
  *  matrix test program.  This routine should be executed after the function
  *  spFileMatrix.
  *
- *  >>> Returns:
+ *  \return
  *  One is returned if routine was successful, otherwise zero is returned.
- *  The calling function can query errno (the system global error variable)
+ *  The calling function can query \a errno (the system global error variable)
  *  as to the reason why this routine failed.
  *
- *  >>> Arguments:
- *  Matrix  <input>  (char *)
+ *  \param eMatrix
  *      Pointer to matrix.
- *  File  <input>  (char *)
+ *  \param File
  *      Name of file into which matrix is to be written.
- *  RHS  <input>  (RealNumber [])
+ *  \param RHS
  *      Right-hand side vector. This is only the real portion if
- *      spSEPARATED_COMPLEX_VECTORS is true.
- *  iRHS  <input>  (RealNumber [])
+ *      \a spSEPARATED_COMPLEX_VECTORS is true.
+ *  \param iRHS
  *      Right-hand side vector, imaginary portion.  Not necessary if matrix
- *      is real or if spSEPARATED_COMPLEX_VECTORS is set false.
- *
- *  >>> Local variables:
+ *      is real or if \a spSEPARATED_COMPLEX_VECTORS is set false.
+ *      \a iRHS is a macro that replaces itself with `, iRHS' if the options
+ *      \a spCOMPLEX and \a spSEPARATED_COMPLEX_VECTORS are set, otherwise
+ *      it disappears without a trace.
+ */
+/*  >>> Local variables:
  *  pMatrixFile  (FILE *)
  *      File pointer to the matrix file.
  *  Size  (int)
  *      The size of the matrix.
- *
- *  >>> Obscure Macros
- *  IMAG_RHS
- *      Replaces itself with `, iRHS' if the options spCOMPLEX and
- *      spSEPARATED_COMPLEX_VECTORS are set, otherwise it disappears
- *      without a trace.
  */
-#if spSEPARATED_COMPLEX_VECTORS
-int spFileVector(char *eMatrix, char *File, RealVector RHS, RealVector iRHS)
-#else
-int spFileVector(char *eMatrix, char *File, RealVector RHS)
+
+int
+spFileVector(
+    spMatrix eMatrix,
+    char *File,
+    spREAL RHS[]
+#if spCOMPLEX AND spSEPARATED_COMPLEX_VECTORS
+    , spREAL iRHS[]
 #endif
+)
 {
-    MatrixPtr Matrix = (MatrixPtr)eMatrix;
-    int I, Size, Err = 0;
-    FILE* pMatrixFile;
+MatrixPtr  Matrix = (MatrixPtr)eMatrix;
+register  int  I, Size, Err;
+FILE  *pMatrixFile;
 
-    /* Begin `spFileVector'. */
-    ASSERT( IS_SPARSE( Matrix ) AND RHS != NULL)
+/* Begin `spFileVector'. */
+    ASSERT_IS_SPARSE( Matrix );
+    vASSERT( RHS != NULL, "Vector missing" );
 
-    /* Open File in append mode. */
+/* Open File in append mode. */
     if ((pMatrixFile = fopen(File,"a")) == NULL)
         return 0;
 
@@ -575,7 +584,7 @@ int spFileVector(char *eMatrix, char *File, RealVector RHS)
     if (Matrix->Complex)
     {
 #if spSEPARATED_COMPLEX_VECTORS
-        ASSERT(iRHS != NULL)
+        vASSERT( iRHS != NULL, "Imaginary vector missing" );
         --RHS;
         --iRHS;
 #else
@@ -588,26 +597,27 @@ int spFileVector(char *eMatrix, char *File, RealVector RHS)
 #endif /* NOT ARRAY_OFFSET */
 
 
-    /* Output vector. */
+/* Output vector. */
     Size = Matrix->Size;
+    if (Size == 0) return 1;
+
 #if spCOMPLEX
     if (Matrix->Complex)
     {
 #if spSEPARATED_COMPLEX_VECTORS
         for (I = 1; I <= Size; I++)
         {   Err = fprintf
-                (   pMatrixFile, "%-.15lg\t%-.15lg\n",
-                 (double)RHS[I], (double)iRHS[I]
-                 );
+            (   pMatrixFile, "%-.15g\t%-.15g\n",
+                (double)RHS[I], (double)iRHS[I]
+            );
             if (Err < 0) return 0;
         }
 #else
         for (I = 1; I <= Size; I++)
-        {
-            Err = fprintf
-                (   pMatrixFile, "%-.15lg\t%-.15lg\n",
-                 (double)RHS[2*I], (double)RHS[2*I+1]
-                 );
+        {   Err = fprintf
+            (   pMatrixFile, "%-.15g\t%-.15g\n",
+                (double)RHS[2*I], (double)RHS[2*I+1]
+            );
             if (Err < 0) return 0;
         }
 #endif
@@ -617,39 +627,43 @@ int spFileVector(char *eMatrix, char *File, RealVector RHS)
     else
 #endif
 #if REAL
-    {
-        for (I = 1; I <= Size; I++)
-        {   if (fprintf(pMatrixFile, "%-.15lg\n", (double)RHS[I]) < 0)
+    {   for (I = 1; I <= Size; I++)
+        {   if (fprintf(pMatrixFile, "%-.15g\n", (double)RHS[I]) < 0)
                 return 0;
         }
     }
 #endif /* REAL */
 
-    /* Close file. */
+/* Close file. */
     if (fclose(pMatrixFile) < 0) return 0;
     return 1;
 }
 
-/*
- *  OUTPUT STATISTICS TO FILE
- *
+
+
+
+
+
+
+
+
+/*!
  *  Writes useful information concerning the matrix to a file.  Should be
  *  executed after the matrix is factored.
- *
- *  >>> Returns:
+ * 
+ *  \return
  *  One is returned if routine was successful, otherwise zero is returned.
- *  The calling function can query errno (the system global error variable)
+ *  The calling function can query \a errno (the system global error variable)
  *  as to the reason why this routine failed.
  *
- *  >>> Arguments:
- *  Matrix  <input>  (char *)
+ *  \param eMatrix
  *      Pointer to matrix.
- *  File  <input>  (char *)
+ *  \param File
  *      Name of file into which matrix is to be written.
- *  Label  <input>  (char *)
+ *  \param Label
  *      String that is transferred to file and is used as a label.
- *
- *  >>> Local variables:
+ */
+/*  >>> Local variables:
  *  Data  (RealNumber)
  *      The value of the matrix element being output.
  *  LargestElement  (RealNumber)
@@ -666,23 +680,28 @@ int spFileVector(char *eMatrix, char *File, RealVector RHS)
  *      The smallest element in the matrix excluding zero elements.
  */
 
-int spFileStats(char* eMatrix, char* File, char* Label)
+int
+spFileStats(
+    spMatrix eMatrix,
+    char *File,
+    char *Label
+)
 {
-    MatrixPtr Matrix = (MatrixPtr)eMatrix;
-    int Size, I;
-    ElementPtr pElement;
-    int NumberOfElements;
-    RealNumber Data, LargestElement, SmallestElement;
-    FILE* pStatsFile;
+MatrixPtr  Matrix = (MatrixPtr)eMatrix;
+register  int  Size, I;
+register  ElementPtr  pElement;
+int NumberOfElements;
+RealNumber  Data, LargestElement, SmallestElement;
+FILE  *pStatsFile;
 
-    /* Begin `spFileStats'. */
-    ASSERT( IS_SPARSE( Matrix ) );
+/* Begin `spFileStats'. */
+    ASSERT_IS_SPARSE( Matrix );
 
-    /* Open File in append mode. */
+/* Open File in append mode. */
     if ((pStatsFile = fopen(File, "a")) == NULL)
         return 0;
 
-    /* Output statistics. */
+/* Output statistics. */
     Size = Matrix->Size;
     if (NOT Matrix->Factored)
         fprintf(pStatsFile, "Matrix has not been factored.\n");
@@ -693,18 +712,17 @@ int spFileStats(char* eMatrix, char* File, char* Label)
     else
         fprintf(pStatsFile, "Matrix is real.\n");
     fprintf(pStatsFile,"     Size = %d\n",Size);
+    if (Size == 0) return 1;
 
-    /* Search matrix. */
+/* Search matrix. */
     NumberOfElements = 0;
     LargestElement = 0.0;
     SmallestElement = LARGEST_REAL;
 
     for (I = 1; I <= Size; I++)
-    {
-        pElement = Matrix->FirstInCol[I];
+    {   pElement = Matrix->FirstInCol[I];
         while (pElement != NULL)
-        {
-            NumberOfElements++;
+        {   NumberOfElements++;
             Data = ELEMENT_MAG(pElement);
             if (Data > LargestElement)
                 LargestElement = Data;
@@ -716,27 +734,27 @@ int spFileStats(char* eMatrix, char* File, char* Label)
 
     SmallestElement = MIN( SmallestElement, LargestElement );
 
-    /* Output remaining statistics. */
+/* Output remaining statistics. */
     fprintf(pStatsFile, "     Initial number of elements = %d\n",
             NumberOfElements - Matrix->Fillins);
     fprintf(pStatsFile,
-            "     Initial average number of elements per row = %lf\n",
+            "     Initial average number of elements per row = %f\n",
             (double)(NumberOfElements - Matrix->Fillins) / (double)Size);
     fprintf(pStatsFile, "     Fill-ins = %d\n",Matrix->Fillins);
-    fprintf(pStatsFile, "     Average number of fill-ins per row = %lf%%\n",
+    fprintf(pStatsFile, "     Average number of fill-ins per row = %f%%\n",
             (double)Matrix->Fillins / (double)Size);
     fprintf(pStatsFile, "     Total number of elements = %d\n",
             NumberOfElements);
-    fprintf(pStatsFile, "     Average number of elements per row = %lf\n",
+    fprintf(pStatsFile, "     Average number of elements per row = %f\n",
             (double)NumberOfElements / (double)Size);
-    fprintf(pStatsFile,"     Density = %lf%%\n",
-            (double)(100.0*NumberOfElements)/(double)(Size*Size));
+    fprintf(pStatsFile,"     Density = %f%%\n",
+	    (100.0*(double)NumberOfElements)/((double)Size*(double)Size));
     fprintf(pStatsFile,"     Relative Threshold = %e\n", Matrix->RelThreshold);
     fprintf(pStatsFile,"     Absolute Threshold = %e\n", Matrix->AbsThreshold);
     fprintf(pStatsFile,"     Largest Element = %e\n", LargestElement);
     fprintf(pStatsFile,"     Smallest Element = %e\n\n\n", SmallestElement);
 
-    /* Close file. */
+/* Close file. */
     (void)fclose(pStatsFile);
     return 1;
 }

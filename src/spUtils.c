@@ -4,10 +4,17 @@
  *  Author:                     Advising professor:
  *      Kenneth S. Kundert          Alberto Sangiovanni-Vincentelli
  *      UC Berkeley
- *
+ */
+/*! \file
  *  This file contains various optional utility routines.
  *
- *  >>> User accessible functions contained in this file:
+ *  Objects that begin with the \a spc prefix are considered private
+ *  and should not be used.
+ *
+ *  \author
+ *  Kenneth S. Kundert <kundert@users.sourceforge.net>
+ */
+/*  >>> User accessible functions contained in this file:
  *  spMNA_Preorder
  *  spScale
  *  spMultiply
@@ -20,6 +27,7 @@
  *  spNorm
  *  spLargestElement
  *  spRoundoff
+ *  spErrorMessage
  *
  *  >>> Other functions contained in this file:
  *  CountTwins
@@ -33,25 +41,17 @@
 /*
  *  Revision and copyright information.
  *
- *  Copyright (c) 1985,86,87,88
- *  by Kenneth S. Kundert and the University of California.
- *
- *  Permission to use, copy, modify, and distribute this software and
- *  its documentation for any purpose and without fee is hereby granted,
- *  provided that the copyright notices appear in all copies and
- *  supporting documentation and that the authors and the University of
- *  California are properly credited.  The authors and the University of
- *  California make no representations as to the suitability of this
- *  software for any purpose.  It is provided `as is', without express
- *  or implied warranty.
+ *  Copyright (c) 1985-2003 by Kenneth S. Kundert
  */
 
 #ifndef lint
 static char copyright[] =
-    "Sparse1.3: Copyright (c) 1985,86,87,88 by Kenneth S. Kundert";
+    "Sparse1.4: Copyright (c) 1985-2003 by Kenneth S. Kundert";
 static char RCSid[] =
-    "@(#)$Header: /local/cvs/freeda/libs/sparse/spUtils.c,v 1.1.1.1 2004/02/25 18:15:35 nmkripla Exp $";
+    "@(#)$Header: /cvsroot/sparse/src/spUtils.c,v 1.4 2003/06/30 19:40:52 kundert Exp $";
 #endif
+
+
 
 /*
  *  IMPORTS
@@ -66,20 +66,42 @@ static char RCSid[] =
  */
 
 #define spINSIDE_SPARSE
-#include "inc/spConfig.h"
-#include "inc/spMatrix.h"
-#include "inc/spDefs.h"
+#include <stdio.h>
+#include "spConfig.h"
+#include "spMatrix.h"
+#include "spDefs.h"
 
-int CountTwins(MatrixPtr Matrix, int Col, ElementPtr* ppTwin1, ElementPtr* ppTwin2);
-void SwapCols(MatrixPtr Matrix, ElementPtr pTwin1, ElementPtr pTwin2);
-static void ScaleComplexMatrix(MatrixPtr Matrix, RealVector RHS_ScaleFactors, RealVector SolutionScaleFactors);
-static void ComplexMatrixMultiply(MatrixPtr Matrix, RealVector RHS, RealVector Solution IMAG_VECTORS);
-RealNumber ComplexCondition(MatrixPtr Matrix, RealNumber NormOfMatrix, int*pError);
 
-#if MODIFIED_NODAL
+
+
+
 /*
- *  PREORDER MODIFIED NODE ADMITTANCE MATRIX TO REMOVE ZEROS FROM DIAGONAL
- *
+ *  Function declarations
+ */
+
+static int CountTwins( MatrixPtr, int, ElementPtr*, ElementPtr* );
+static void SwapCols( MatrixPtr, ElementPtr, ElementPtr );
+static void ScaleComplexMatrix( MatrixPtr, RealVector, RealVector );
+#if spSEPARATED_COMPLEX_VECTORS
+static void ComplexMatrixMultiply( MatrixPtr,
+			RealVector, RealVector, RealVector, RealVector );
+static void ComplexTransposedMatrixMultiply( MatrixPtr,
+			RealVector, RealVector, RealVector, RealVector );
+#else
+static void ComplexMatrixMultiply( MatrixPtr,
+			RealVector, RealVector );
+static void ComplexTransposedMatrixMultiply( MatrixPtr,
+			RealVector, RealVector );
+#endif
+static RealNumber ComplexCondition( MatrixPtr, RealNumber, int* );
+
+
+
+
+
+
+#if MODIFIED_NODAL
+/*!
  *  This routine massages modified node admittance matrices to remove
  *  zeros from the diagonal.  It takes advantage of the fact that the
  *  row and column associated with a zero diagonal usually have
@@ -93,44 +115,50 @@ RealNumber ComplexCondition(MatrixPtr Matrix, RealNumber NormOfMatrix, int*pErro
  *
  *  This routine exploits the fact that the structural ones are placed
  *  in the matrix in symmetric twins.  For example, the stamps for
- *  grounded and a floating voltage sources are
+ *  grounded and a floating voltage sources are \code
  *  grounded:              floating:
  *  [  x   x   1 ]         [  x   x   1 ]
  *  [  x   x     ]         [  x   x  -1 ]
  *  [  1         ]         [  1  -1     ]
+ *  \endcode
  *  Notice for the grounded source, there is one set of twins, and for
  *  the floating, there are two sets.  We remove the zero from the diagonal
- *  by swapping the rows associated with a set of twins.  For example:
+ *  by swapping the rows associated with a set of twins.  For example: \code
  *  grounded:              floating 1:            floating 2:
  *  [  1         ]         [  1  -1     ]         [  x   x   1 ]
  *  [  x   x     ]         [  x   x  -1 ]         [  1  -1     ]
  *  [  x   x   1 ]         [  x   x   1 ]         [  x   x  -1 ]
+ *  \endcode
  *
  *  It is important to deal with any zero diagonals that only have one
  *  set of twins before dealing with those that have more than one because
  *  swapping row destroys the symmetry of any twins in the rows being
- *  swapped, which may limit future moves.  Consider
+ *  swapped, which may limit future moves.  Consider \code
  *  [  x   x   1     ]
  *  [  x   x  -1   1 ]
  *  [  1  -1         ]
  *  [      1         ]
+ *  \endcode
  *  There is one set of twins for diagonal 4 and two for diagonal 3.
- *  Dealing with diagonal 4 first requires swapping rows 2 and 4.
+ *  Dealing with diagonal 4 first requires swapping rows 2 and 4. \code
  *  [  x   x   1     ]
  *  [      1         ]
  *  [  1  -1         ]
  *  [  x   x  -1   1 ]
- *  We can now deal with diagonal 3 by swapping rows 1 and 3.
+ *  \endcode
+ *  We can now deal with diagonal 3 by swapping rows 1 and 3. \code
  *  [  1  -1         ]
  *  [      1         ]
  *  [  x   x   1     ]
  *  [  x   x  -1   1 ]
+ *  \endcode
  *  And we are done, there are no zeros left on the diagonal.  However, if
- *  we originally dealt with diagonal 3 first, we could swap rows 2 and 3
+ *  we originally dealt with diagonal 3 first, we could swap rows 2 and 3 \code
  *  [  x   x   1     ]
  *  [  1  -1         ]
  *  [  x   x  -1   1 ]
  *  [      1         ]
+ *  \endcode
  *  Diagonal 4 no longer has a symmetric twin and we cannot continue.
  *
  *  So we always take care of lone twins first.  When none remain, we
@@ -143,11 +171,10 @@ RealNumber ComplexCondition(MatrixPtr Matrix, RealNumber NormOfMatrix, int*pErro
  *  The algorithm used in this function was developed by Ken Kundert and
  *  Tom Quarles.
  *
- *  >>> Arguments:
- *  eMatrix  <input>  (char *)
+ *  \param *  eMatrix 
  *      Pointer to the matrix to be preordered.
- *
- *  >>> Local variables;
+ */
+/*  >>> Local variables;
  *  J  (int)
  *      Column with zero diagonal being currently considered.
  *  pTwin1  (ElementPtr)
@@ -166,57 +193,59 @@ RealNumber ComplexCondition(MatrixPtr Matrix, RealNumber NormOfMatrix, int*pErro
  *      Number of symmetric twins corresponding to current zero diagonal.
  */
 
-void spMNA_Preorder(char* eMatrix)
+void
+spMNA_Preorder( spMatrix eMatrix )
 {
-    MatrixPtr Matrix = (MatrixPtr)eMatrix;
-    int J, Size;
-    ElementPtr pTwin1, pTwin2;
-    int Twins, StartAt = 1;
-    BOOLEAN Swapped, AnotherPassNeeded;
+MatrixPtr  Matrix = (MatrixPtr)eMatrix;
+register  int  J, Size;
+ElementPtr  pTwin1, pTwin2;
+int  Twins, StartAt = 1;
+BOOLEAN  Swapped, AnotherPassNeeded;
 
-    /* Begin `spMNA_Preorder'. */
-    ASSERT( IS_VALID(Matrix) AND NOT Matrix->Factored );
+/* Begin `spMNA_Preorder'. */
+    ASSERT_IS_SPARSE( Matrix );
+    ASSERT_NO_ERRORS( Matrix );
+    ASSERT_IS_NOT_FACTORED( Matrix );
 
     if (Matrix->RowsLinked) return;
     Size = Matrix->Size;
     Matrix->Reordered = YES;
 
-    do{
-        AnotherPassNeeded = Swapped = NO;
+    do
+    {   AnotherPassNeeded = Swapped = NO;
 
-        /* Search for zero diagonals with lone twins. */
+/* Search for zero diagonals with lone twins. */
         for (J = StartAt; J <= Size; J++)
-        {
-            if (Matrix->Diag[J] == NULL)
-            {
-                Twins = CountTwins( Matrix, J, &pTwin1, &pTwin2 );
+        {   if (Matrix->Diag[J] == NULL)
+            {   Twins = CountTwins( Matrix, J, &pTwin1, &pTwin2 );
                 if (Twins == 1)
                 {   /* Lone twins found, swap rows. */
                     SwapCols( Matrix, pTwin1, pTwin2 );
                     Swapped = YES;
                 }
                 else if ((Twins > 1) AND NOT AnotherPassNeeded)
-                {
-                    AnotherPassNeeded = YES;
+                {   AnotherPassNeeded = YES;
                     StartAt = J;
                 }
             }
         }
 
-        /* All lone twins are gone, look for zero diagonals with multiple twins. */
+/* All lone twins are gone, look for zero diagonals with multiple twins. */
         if (AnotherPassNeeded)
         {   for (J = StartAt; NOT Swapped AND (J <= Size); J++)
-            {
-                if (Matrix->Diag[J] == NULL)
-                {
-                    Twins = CountTwins( Matrix, J, &pTwin1, &pTwin2 );
+            {   if (Matrix->Diag[J] == NULL)
+                {   Twins = CountTwins( Matrix, J, &pTwin1, &pTwin2 );
                     SwapCols( Matrix, pTwin1, pTwin2 );
                     Swapped = YES;
                 }
             }
         }
     } while (AnotherPassNeeded);
+    return;
 }
+
+
+
 
 /*
  *  COUNT TWINS
@@ -226,26 +255,28 @@ void spMNA_Preorder(char* eMatrix)
  *  count is terminated early at two.
  */
 
-/*static*/ int CountTwins(MatrixPtr Matrix, int Col,
-                          ElementPtr* ppTwin1, ElementPtr* ppTwin2)
+static int
+CountTwins(
+    MatrixPtr Matrix,
+    int Col,
+    ElementPtr *ppTwin1,
+    ElementPtr *ppTwin2
+)
 {
-    int Row, Twins = 0;
-    ElementPtr pTwin1, pTwin2;
+int Row, Twins = 0;
+ElementPtr pTwin1, pTwin2;
 
-    /* Begin `CountTwins'. */
+/* Begin `CountTwins'. */
 
     pTwin1 = Matrix->FirstInCol[Col];
     while (pTwin1 != NULL)
-    {
-        if (ABS(pTwin1->Real) == 1.0)
-        {
-            Row = pTwin1->Row;
+    {   if (ABS(pTwin1->Real) == 1.0)
+        {   Row = pTwin1->Row;
             pTwin2 = Matrix->FirstInCol[Row];
             while ((pTwin2 != NULL) AND (pTwin2->Row != Col))
                 pTwin2 = pTwin2->NextInCol;
             if ((pTwin2 != NULL) AND (ABS(pTwin2->Real) == 1.0))
-            {
-                /* Found symmetric twins. */
+            {   /* Found symmetric twins. */
                 if (++Twins >= 2) return Twins;
                 (*ppTwin1 = pTwin1)->Col = Col;
                 (*ppTwin2 = pTwin2)->Col = Row;
@@ -256,6 +287,9 @@ void spMNA_Preorder(char* eMatrix)
     return Twins;
 }
 
+
+
+
 /*
  *  SWAP COLUMNS
  *
@@ -263,11 +297,16 @@ void spMNA_Preorder(char* eMatrix)
  *  linked.
  */
 
-/*static*/ void SwapCols(MatrixPtr Matrix, ElementPtr pTwin1, ElementPtr pTwin2)
+static void
+SwapCols(
+    MatrixPtr Matrix,
+    ElementPtr pTwin1,
+    ElementPtr pTwin2
+)
 {
-    int Col1 = pTwin1->Col, Col2 = pTwin2->Col;
+int Col1 = pTwin1->Col, Col2 = pTwin2->Col;
 
-    /* Begin `SwapCols'. */
+/* Begin `SwapCols'. */
 
     SWAP (ElementPtr, Matrix->FirstInCol[Col1], Matrix->FirstInCol[Col2]);
     SWAP (int, Matrix->IntToExtColMap[Col1], Matrix->IntToExtColMap[Col2]);
@@ -279,13 +318,20 @@ void spMNA_Preorder(char* eMatrix)
     Matrix->Diag[Col1] = pTwin2;
     Matrix->Diag[Col2] = pTwin1;
     Matrix->NumberOfInterchangesIsOdd = NOT Matrix->NumberOfInterchangesIsOdd;
+    return;
 }
 #endif /* MODIFIED_NODAL */
 
+
+
+
+
+
+
+
+
 #if SCALING
-/*
- *  SCALE MATRIX
- *
+/*!
  *  This function scales the matrix to enhance the possibility of
  *  finding a good pivoting order.  Note that scaling enhances accuracy
  *  of the solution only if it affects the pivoting order, so it makes
@@ -315,19 +361,18 @@ void spMNA_Preorder(char* eMatrix)
  *  pivoting order, and then throw away the matrix.  Subsequent
  *  factorizations, performed with spFactor(), will not need to have
  *  the RHS and Solution vectors descaled.  Lastly, this function
- *  should not be executed before the function spMNA_Preorder.
+ *  should not be executed before the function spMNA_Preorder().
  *
- *  >>> Arguments:
- *  eMatrix  <input> (char *)
+ *  \param eMatrix
  *      Pointer to the matrix to be scaled.
- *  SolutionScaleFactors  <input>  (RealVector)
+ *  \param SolutionScaleFactors
  *      The array of Solution scale factors.  These factors scale the columns.
  *      All scale factors are real valued.
- *  RHS_ScaleFactors  <input>  (RealVector)
+ *  \param RHS_ScaleFactors
  *      The array of RHS scale factors.  These factors scale the rows.
  *      All scale factors are real valued.
- *
- *  >>> Local variables:
+ */
+/*  >>> Local variables:
  *  lSize  (int)
  *      Local version of the size of the matrix.
  *  pElement  (ElementPtr)
@@ -339,21 +384,28 @@ void spMNA_Preorder(char* eMatrix)
  *      The scale factor being used on the current row or column.
  */
 
-void spScale(char* eMatrix, RealVector RHS_ScaleFactors, RealVector SolutionScaleFactors)
+void
+spScale(
+    spMatrix eMatrix,
+    spREAL RHS_ScaleFactors[],
+    spREAL SolutionScaleFactors[]
+)
 {
-    MatrixPtr Matrix = (MatrixPtr)eMatrix;
-    ElementPtr pElement;
-    int I, lSize, *pExtOrder;
-    RealNumber ScaleFactor;
+MatrixPtr  Matrix = (MatrixPtr)eMatrix;
+register ElementPtr  pElement;
+register int  I, lSize, *pExtOrder;
+RealNumber  ScaleFactor;
+void ScaleComplexMatrix();
 
-    /* Begin `spScale'. */
-    ASSERT( IS_VALID(Matrix) AND NOT Matrix->Factored );
+/* Begin `spScale'. */
+    ASSERT_IS_SPARSE( Matrix );
+    ASSERT_NO_ERRORS( Matrix );
+    ASSERT_IS_NOT_FACTORED( Matrix );
     if (NOT Matrix->RowsLinked) spcLinkRows( Matrix );
 
 #if spCOMPLEX
     if (Matrix->Complex)
-    {
-        ScaleComplexMatrix( Matrix, RHS_ScaleFactors, SolutionScaleFactors );
+    {   ScaleComplexMatrix( Matrix, RHS_ScaleFactors, SolutionScaleFactors );
         return;
     }
 #endif
@@ -367,42 +419,45 @@ void spScale(char* eMatrix, RealVector RHS_ScaleFactors, RealVector SolutionScal
     --SolutionScaleFactors;
 #endif
 
-    /* Scale Rows */
+/* Scale Rows */
     pExtOrder = &Matrix->IntToExtRowMap[1];
     for (I = 1; I <= lSize; I++)
-    {
-        if ((ScaleFactor = RHS_ScaleFactors[*(pExtOrder++)]) != 1.0)
-        {
-            pElement = Matrix->FirstInRow[I];
+    {   if ((ScaleFactor = RHS_ScaleFactors[*(pExtOrder++)]) != 1.0)
+        {   pElement = Matrix->FirstInRow[I];
 
             while (pElement != NULL)
-            {
-                pElement->Real *= ScaleFactor;
+            {   pElement->Real *= ScaleFactor;
                 pElement = pElement->NextInRow;
             }
         }
     }
 
-    /* Scale Columns */
+/* Scale Columns */
     pExtOrder = &Matrix->IntToExtColMap[1];
     for (I = 1; I <= lSize; I++)
-    {
-        if ((ScaleFactor = SolutionScaleFactors[*(pExtOrder++)]) != 1.0)
-        {
-            pElement = Matrix->FirstInCol[I];
+    {   if ((ScaleFactor = SolutionScaleFactors[*(pExtOrder++)]) != 1.0)
+        {   pElement = Matrix->FirstInCol[I];
 
             while (pElement != NULL)
-            {
-                pElement->Real *= ScaleFactor;
+            {   pElement->Real *= ScaleFactor;
                 pElement = pElement->NextInCol;
             }
         }
     }
+    return;
 
 #endif /* REAL */
 }
 #endif /* SCALING */
 
+
+
+
+
+
+
+
+
 #if spCOMPLEX AND SCALING
 /*
  *  SCALE COMPLEX MATRIX
@@ -460,15 +515,18 @@ void spScale(char* eMatrix, RealVector RHS_ScaleFactors, RealVector SolutionScal
  *      The scale factor being used on the current row or column.
  */
 
-static void ScaleComplexMatrix(MatrixPtr Matrix, RealVector RHS_ScaleFactors,
-                               RealVector SolutionScaleFactors)
-
+static void
+ScaleComplexMatrix(
+    MatrixPtr Matrix,
+    register RealVector RHS_ScaleFactors,
+    register RealVector SolutionScaleFactors
+)
 {
-    ElementPtr pElement;
-    int I, lSize, *pExtOrder;
-    RealNumber ScaleFactor;
+register ElementPtr  pElement;
+register int  I, lSize, *pExtOrder;
+RealNumber  ScaleFactor;
 
-    /* Begin `ScaleComplexMatrix'. */
+/* Begin `ScaleComplexMatrix'. */
     lSize = Matrix->Size;
 
 /* Correct pointers to arrays for ARRAY_OFFSET */
@@ -477,34 +535,28 @@ static void ScaleComplexMatrix(MatrixPtr Matrix, RealVector RHS_ScaleFactors,
     --SolutionScaleFactors;
 #endif
 
-    /* Scale Rows */
+/* Scale Rows */
     pExtOrder = &Matrix->IntToExtRowMap[1];
     for (I = 1; I <= lSize; I++)
-    {
-        if ((ScaleFactor = RHS_ScaleFactors[*(pExtOrder++)]) != 1.0)
-        {
-            pElement = Matrix->FirstInRow[I];
+    {   if ((ScaleFactor = RHS_ScaleFactors[*(pExtOrder++)]) != 1.0)
+        {   pElement = Matrix->FirstInRow[I];
 
             while (pElement != NULL)
-            {
-                pElement->Real *= ScaleFactor;
+            {   pElement->Real *= ScaleFactor;
                 pElement->Imag *= ScaleFactor;
                 pElement = pElement->NextInRow;
             }
         }
     }
 
-    /* Scale Columns */
+/* Scale Columns */
     pExtOrder = &Matrix->IntToExtColMap[1];
     for (I = 1; I <= lSize; I++)
-    {
-        if ((ScaleFactor = SolutionScaleFactors[*(pExtOrder++)]) != 1.0)
-        {
-            pElement = Matrix->FirstInCol[I];
+    {   if ((ScaleFactor = SolutionScaleFactors[*(pExtOrder++)]) != 1.0)
+        {   pElement = Matrix->FirstInCol[I];
 
             while (pElement != NULL)
-            {
-                pElement->Real *= ScaleFactor;
+            {   pElement->Real *= ScaleFactor;
                 pElement->Imag *= ScaleFactor;
                 pElement = pElement->NextInCol;
             }
@@ -514,66 +566,77 @@ static void ScaleComplexMatrix(MatrixPtr Matrix, RealVector RHS_ScaleFactors,
 }
 #endif /* SCALING AND spCOMPLEX */
 
+
+
+
+
+
+
+
 #if MULTIPLICATION
-/*
- *  MATRIX MULTIPLICATION
- *
+/*!
  *  Multiplies matrix by solution vector to find source vector.
  *  Assumes matrix has not been factored.  This routine can be used
  *  as a test to see if solutions are correct.  It should not be used
  *  before spMNA_Preorder().
  *
- *  >>> Arguments:
- *  eMatrix  <input>  (char *)
+ *  \param eMatrix
  *      Pointer to the matrix.
- *  RHS  <output>  (RealVector)
+ *  \param RHS
  *      RHS is the right hand side. This is what is being solved for.
- *  Solution  <input>  (RealVector)
+ *  \param Solution
  *      Solution is the vector being multiplied by the matrix.
- *  iRHS  <output>  (RealVector)
+ *  \param iRHS
  *      iRHS is the imaginary portion of the right hand side. This is
  *      what is being solved for.  This is only necessary if the matrix is
- *      complex and spSEPARATED_COMPLEX_VECTORS is true.
- *  iSolution  <input>  (RealVector)
+ *      complex and \a spSEPARATED_COMPLEX_VECTORS is true.
+ *  \param iSolution
  *      iSolution is the imaginary portion of the vector being multiplied
  *      by the matrix. This is only necessary if the matrix is
- *      complex and spSEPARATED_COMPLEX_VECTORS is true.
- *
- *  >>> Obscure Macros
- *  IMAG_VECTORS
- *      Replaces itself with `, iRHS, iSolution' if the options spCOMPLEX and
- *      spSEPARATED_COMPLEX_VECTORS are set, otherwise it disappears
- *      without a trace.
+ *      complex and \a spSEPARATED_COMPLEX_VECTORS is true.
  */
 
-void spMultiply(char *eMatrix, RealVector RHS, RealVector Solution IMAG_VECTORS)
+void
+spMultiply(
+    spMatrix eMatrix,
+    spREAL RHS[],
+    spREAL Solution[]
+#if spCOMPLEX AND spSEPARATED_COMPLEX_VECTORS
+    , spREAL iRHS[]
+    , spREAL iSolution[]
+#endif
+)
 {
-    ElementPtr pElement;
-    RealVector Vector;
-    RealNumber Sum;
-    int I, *pExtOrder;
-    MatrixPtr  Matrix = (MatrixPtr)eMatrix;
+register  ElementPtr  pElement;
+register  RealVector  Vector;
+register  RealNumber  Sum;
+register  int  I, *pExtOrder;
+MatrixPtr  Matrix = (MatrixPtr)eMatrix;
+extern void ComplexMatrixMultiply();
 
-    /* Begin `spMultiply'. */
-    ASSERT( IS_SPARSE( Matrix ) AND NOT Matrix->Factored );
-    if (NOT Matrix->RowsLinked) spcLinkRows(Matrix);
+/* Begin `spMultiply'. */
+    ASSERT_IS_SPARSE( Matrix );
+    ASSERT_IS_NOT_FACTORED( Matrix );
+    if (NOT Matrix->RowsLinked)
+	spcLinkRows(Matrix);
+    if (NOT Matrix->InternalVectorsAllocated)
+	spcCreateInternalVectors( Matrix );
 
 #if spCOMPLEX
     if (Matrix->Complex)
-    {
-        ComplexMatrixMultiply( Matrix, RHS, Solution IMAG_VECTORS );
+    {   ComplexMatrixMultiply( Matrix, RHS, Solution IMAG_VECTORS );
         return;
     }
 #endif
 
 #if REAL
 #if NOT ARRAY_OFFSET
-    /* Correct array pointers for ARRAY_OFFSET. */
+/* Correct array pointers for ARRAY_OFFSET. */
     --RHS;
     --Solution;
 #endif
 
-    /* Initialize Intermediate vector with reordered Solution vector. */
+/* Initialize Intermediate vector with reordered Solution vector. */
     Vector = Matrix->Intermediate;
     pExtOrder = &Matrix->IntToExtColMap[Matrix->Size];
     for (I = Matrix->Size; I > 0; I--)
@@ -581,13 +644,11 @@ void spMultiply(char *eMatrix, RealVector RHS, RealVector Solution IMAG_VECTORS)
 
     pExtOrder = &Matrix->IntToExtRowMap[Matrix->Size];
     for (I = Matrix->Size; I > 0; I--)
-    {
-        pElement = Matrix->FirstInRow[I];
+    {   pElement = Matrix->FirstInRow[I];
         Sum = 0.0;
 
         while (pElement != NULL)
-        {
-            Sum += pElement->Real * Vector[pElement->Col];
+        {   Sum += pElement->Real * Vector[pElement->Col];
             pElement = pElement->NextInRow;
         }
         RHS[*pExtOrder--] = Sum;
@@ -597,6 +658,12 @@ void spMultiply(char *eMatrix, RealVector RHS, RealVector Solution IMAG_VECTORS)
 }
 #endif /* MULTIPLICATION */
 
+
+
+
+
+
+
 #if spCOMPLEX AND MULTIPLICATION
 /*
  *  COMPLEX MATRIX MULTIPLICATION
@@ -624,20 +691,23 @@ void spMultiply(char *eMatrix, RealVector RHS, RealVector Solution IMAG_VECTORS)
  *      iSolution is the imaginary portion of the vector being multiplied
  *      by the matrix. This is only necessary if the matrix is
  *      complex and spSEPARATED_COMPLEX_VECTORS is true.
- *
- *  >>> Obscure Macros
- *  IMAG_VECTORS
- *      Replaces itself with `, iRHS, iSolution' if the options spCOMPLEX and
- *      spSEPARATED_COMPLEX_VECTORS are set, otherwise it disappears
- *      without a trace.
  */
 
-static void ComplexMatrixMultiply(MatrixPtr Matrix, RealVector RHS, RealVector Solution IMAG_VECTORS)
+static void
+ComplexMatrixMultiply(
+    MatrixPtr  Matrix,
+    RealVector RHS,
+    RealVector Solution
+#if spSEPARATED_COMPLEX_VECTORS
+    , RealVector iRHS
+    , RealVector iSolution
+#endif
+)
 {
-    ElementPtr pElement;
-    ComplexVector Vector;
-    ComplexNumber Sum;
-    int I, *pExtOrder;
+register  ElementPtr  pElement;
+register  ComplexVector  Vector;
+ComplexNumber  Sum;
+register  int  I, *pExtOrder;
 
 /* Begin `ComplexMatrixMultiply'. */
 
@@ -651,14 +721,13 @@ static void ComplexMatrixMultiply(MatrixPtr Matrix, RealVector RHS, RealVector S
 #endif
 #endif
 
-    /* Initialize Intermediate vector with reordered Solution vector. */
+/* Initialize Intermediate vector with reordered Solution vector. */
     Vector = (ComplexVector)Matrix->Intermediate;
     pExtOrder = &Matrix->IntToExtColMap[Matrix->Size];
 
 #if spSEPARATED_COMPLEX_VECTORS
     for (I = Matrix->Size; I > 0; I--)
-    {
-        Vector[I].Real = Solution[*pExtOrder];
+    {   Vector[I].Real = Solution[*pExtOrder];
         Vector[I].Imag = iSolution[*(pExtOrder--)];
     }
 #else
@@ -668,13 +737,11 @@ static void ComplexMatrixMultiply(MatrixPtr Matrix, RealVector RHS, RealVector S
 
     pExtOrder = &Matrix->IntToExtRowMap[Matrix->Size];
     for (I = Matrix->Size; I > 0; I--)
-    {
-        pElement = Matrix->FirstInRow[I];
+    {   pElement = Matrix->FirstInRow[I];
         Sum.Real = Sum.Imag = 0.0;
 
         while (pElement != NULL)
-        {
-            /* Cmplx expression : Sum += Element * Vector[Col] */
+        {   /* Cmplx expression : Sum += Element * Vector[Col] */
             CMPLX_MULT_ADD_ASSIGN( Sum, *pElement, Vector[pElement->Col] );
             pElement = pElement->NextInRow;
         }
@@ -690,65 +757,75 @@ static void ComplexMatrixMultiply(MatrixPtr Matrix, RealVector RHS, RealVector S
 }
 #endif /* spCOMPLEX AND MULTIPLICATION */
 
+
+
+
+
+
+
+
 #if MULTIPLICATION AND TRANSPOSE
-/*
- *  TRANSPOSED MATRIX MULTIPLICATION
- *
+/*!
  *  Multiplies transposed matrix by solution vector to find source vector.
  *  Assumes matrix has not been factored.  This routine can be used
  *  as a test to see if solutions are correct.  It should not be used
  *  before spMNA_Preorder().
  *
- *  >>> Arguments:
- *  eMatrix  <input>  (char *)
+ *  \param eMatrix
  *      Pointer to the matrix.
- *  RHS  <output>  (RealVector)
+ *  \param RHS
  *      RHS is the right hand side. This is what is being solved for.
- *  Solution  <input>  (RealVector)
+ *  \param Solution
  *      Solution is the vector being multiplied by the matrix.
- *  iRHS  <output>  (RealVector)
+ *  \param iRHS
  *      iRHS is the imaginary portion of the right hand side. This is
  *      what is being solved for.  This is only necessary if the matrix is
- *      complex and spSEPARATED_COMPLEX_VECTORS is true.
- *  iSolution  <input>  (RealVector)
+ *      complex and \a spSEPARATED_COMPLEX_VECTORS is true.
+ *  \param iSolution
  *      iSolution is the imaginary portion of the vector being multiplied
  *      by the matrix. This is only necessary if the matrix is
- *      complex and spSEPARATED_COMPLEX_VECTORS is true.
- *
- *  >>> Obscure Macros
- *  IMAG_VECTORS
- *      Replaces itself with `, iRHS, iSolution' if the options spCOMPLEX and
- *      spSEPARATED_COMPLEX_VECTORS are set, otherwise it disappears
- *      without a trace.
+ *      complex and \a spSEPARATED_COMPLEX_VECTORS is true.
  */
 
-voidn spMultTransposed(char* eMatrix, RealVector RHS, RealVector Solution IMAG_VECTORS)
+void
+spMultTransposed(
+    spMatrix eMatrix,
+    spREAL RHS[],
+    spREAL Solution[]
+#if spCOMPLEX AND spSEPARATED_COMPLEX_VECTORS
+    , spREAL iRHS[]
+    , spREAL iSolution[]
+#endif
+)
 {
-    ElementPtr pElement;
-    RealVector Vector;
-    RealNumber Sum;
-    int I, *pExtOrder;
-    MatrixPtr Matrix = (MatrixPtr)eMatrix;
+register  ElementPtr  pElement;
+register  RealVector  Vector;
+register  RealNumber  Sum;
+register  int  I, *pExtOrder;
+MatrixPtr  Matrix = (MatrixPtr)eMatrix;
+extern void ComplexTransposedMatrixMultiply();
 
-    /* Begin `spMultTransposed'. */
-    ASSERT( IS_SPARSE( Matrix ) AND NOT Matrix->Factored );
+/* Begin `spMultTransposed'. */
+    ASSERT_IS_SPARSE( Matrix );
+    ASSERT_IS_NOT_FACTORED( Matrix );
+    if (NOT Matrix->InternalVectorsAllocated)
+	spcCreateInternalVectors( Matrix );
 
 #if spCOMPLEX
     if (Matrix->Complex)
-    {
-        ComplexTransposedMatrixMultiply( Matrix, RHS, Solution IMAG_VECTORS );
+    {   ComplexTransposedMatrixMultiply( Matrix, RHS, Solution IMAG_VECTORS );
         return;
     }
 #endif
 
 #if REAL
 #if NOT ARRAY_OFFSET
-    /* Correct array pointers for ARRAY_OFFSET. */
+/* Correct array pointers for ARRAY_OFFSET. */
     --RHS;
     --Solution;
 #endif
 
-    /* Initialize Intermediate vector with reordered Solution vector. */
+/* Initialize Intermediate vector with reordered Solution vector. */
     Vector = Matrix->Intermediate;
     pExtOrder = &Matrix->IntToExtRowMap[Matrix->Size];
     for (I = Matrix->Size; I > 0; I--)
@@ -756,13 +833,11 @@ voidn spMultTransposed(char* eMatrix, RealVector RHS, RealVector Solution IMAG_V
 
     pExtOrder = &Matrix->IntToExtColMap[Matrix->Size];
     for (I = Matrix->Size; I > 0; I--)
-    {
-        pElement = Matrix->FirstInCol[I];
+    {   pElement = Matrix->FirstInCol[I];
         Sum = 0.0;
 
         while (pElement != NULL)
-        {
-            Sum += pElement->Real * Vector[pElement->Row];
+        {   Sum += pElement->Real * Vector[pElement->Row];
             pElement = pElement->NextInCol;
         }
         RHS[*pExtOrder--] = Sum;
@@ -772,6 +847,12 @@ voidn spMultTransposed(char* eMatrix, RealVector RHS, RealVector Solution IMAG_V
 }
 #endif /* MULTIPLICATION AND TRANSPOSE */
 
+
+
+
+
+
+
 #if spCOMPLEX AND MULTIPLICATION AND TRANSPOSE
 /*
  *  COMPLEX TRANSPOSED MATRIX MULTIPLICATION
@@ -807,15 +888,23 @@ voidn spMultTransposed(char* eMatrix, RealVector RHS, RealVector Solution IMAG_V
  *      without a trace.
  */
 
-static void ComplexTransposedMatrixMultiply(MatrixPtr Matrix, RealVector RHS,
-                                RealVector Solution IMAG_VECTORS)
+static void
+ComplexTransposedMatrixMultiply(
+    MatrixPtr  Matrix,
+    RealVector RHS,
+    RealVector Solution
+#if spSEPARATED_COMPLEX_VECTORS
+    , RealVector iRHS
+    , RealVector iSolution
+#endif
+)
 {
-    ElementPtr pElement;
-    ComplexVector Vector;
-    ComplexNumber Sum;
-    int I, *pExtOrder;
+register  ElementPtr  pElement;
+register  ComplexVector  Vector;
+ComplexNumber  Sum;
+register  int  I, *pExtOrder;
 
-/* Begin `ComplexMatrixMultiply'. */
+/* Begin `ComplexTransposedMatrixMultiply'. */
 
 /* Correct array pointers for ARRAY_OFFSET. */
 #if NOT ARRAY_OFFSET
@@ -827,14 +916,13 @@ static void ComplexTransposedMatrixMultiply(MatrixPtr Matrix, RealVector RHS,
 #endif
 #endif
 
-    /* Initialize Intermediate vector with reordered Solution vector. */
+/* Initialize Intermediate vector with reordered Solution vector. */
     Vector = (ComplexVector)Matrix->Intermediate;
     pExtOrder = &Matrix->IntToExtRowMap[Matrix->Size];
 
 #if spSEPARATED_COMPLEX_VECTORS
     for (I = Matrix->Size; I > 0; I--)
-    {
-        Vector[I].Real = Solution[*pExtOrder];
+    {   Vector[I].Real = Solution[*pExtOrder];
         Vector[I].Imag = iSolution[*(pExtOrder--)];
     }
 #else
@@ -844,13 +932,11 @@ static void ComplexTransposedMatrixMultiply(MatrixPtr Matrix, RealVector RHS,
 
     pExtOrder = &Matrix->IntToExtColMap[Matrix->Size];
     for (I = Matrix->Size; I > 0; I--)
-    {
-        pElement = Matrix->FirstInCol[I];
+    {   pElement = Matrix->FirstInCol[I];
         Sum.Real = Sum.Imag = 0.0;
 
         while (pElement != NULL)
         {   /* Cmplx expression : Sum += Element * Vector[Row] */
-
             CMPLX_MULT_ADD_ASSIGN( Sum, *pElement, Vector[pElement->Row] );
             pElement = pElement->NextInCol;
         }
@@ -866,10 +952,15 @@ static void ComplexTransposedMatrixMultiply(MatrixPtr Matrix, RealVector RHS,
 }
 #endif /* spCOMPLEX AND MULTIPLICATION AND TRANSPOSE */
 
+
+
+
+
+
+
+
 #if DETERMINANT
-/*
- *  CALCULATE DETERMINANT
- *
+/*!
  *  This routine in capable of calculating the determinant of the
  *  matrix once the LU factorization has been performed.  Hence, only
  *  use this routine after spFactor() and before spClear().
@@ -883,51 +974,54 @@ static void ComplexTransposedMatrixMultiply(MatrixPtr Matrix, RealVector RHS,
  *  point number.  For this reason the determinant is scaled to a
  *  reasonable value and the logarithm of the scale factor is returned.
  *
- *  >>> Arguments:
- *  eMatrix  <input>  (char *)
+ *  \param eMatrix
  *      A pointer to the matrix for which the determinant is desired.
- *  pExponent  <output>  (int *)
+ *  \param pExponent
  *      The logarithm base 10 of the scale factor for the determinant.  To find
  *      the actual determinant, Exponent should be added to the exponent of
  *      Determinant.
- *  pDeterminant  <output>  (RealNumber *)
+ *  \param pDeterminant
  *      The real portion of the determinant.   This number is scaled to be
  *      greater than or equal to 1.0 and less than 10.0.
- *  piDeterminant  <output>  (RealNumber *)
+ *  \param piDeterminant
  *      The imaginary portion of the determinant.  When the matrix is real
  *      this pointer need not be supplied, nothing will be returned.   This
  *      number is scaled to be greater than or equal to 1.0 and less than 10.0.
- *
- *  >>> Local variables:
+ */
+/*  >>> Local variables:
  *  Norm  (RealNumber)
  *      L-infinity norm of a complex number.
  *  Size  (int)
- *      Local storage for Matrix->Size.
+ *      Local storage for Matrix->Size.  Placed in a register for speed.
  *  Temp  (RealNumber)
  *      Temporary storage for real portion of determinant.
  */
 
+void
+spDeterminant(
+    spMatrix eMatrix,
+    int *pExponent,
+    spREAL *pDeterminant
 #if spCOMPLEX
-void spDeterminant(char* eMatrix, int* pExponent,
-                   RealNumber* pDeterminant, RealNumber* piDeterminant)
-#else
-void spDeterminant(char* eMatrix, int* pExponent, RealNumber* pDeterminant)
+    , spREAL *piDeterminant
 #endif
+)
 {
-    MatrixPtr Matrix = (MatrixPtr)eMatrix;
-    int I, Size;
-    RealNumber Norm, nr, ni;
-    ComplexNumber Pivot, cDeterminant;
+register MatrixPtr  Matrix = (MatrixPtr)eMatrix;
+register int I, Size;
+RealNumber Norm, nr, ni;
+ComplexNumber Pivot, cDeterminant;
 
 #define  NORM(a)     (nr = ABS((a).Real), ni = ABS((a).Imag), MAX (nr,ni))
 
-    /* Begin `spDeterminant'. */
-    ASSERT( IS_SPARSE( Matrix ) AND IS_FACTORED(Matrix) );
+/* Begin `spDeterminant'. */
+    ASSERT_IS_SPARSE( Matrix );
+    ASSERT_NO_ERRORS( Matrix );
+    ASSERT_IS_FACTORED( Matrix );
     *pExponent = 0;
 
     if (Matrix->Error == spSINGULAR)
-    {
-        *pDeterminant = 0.0;
+    {   *pDeterminant = 0.0;
 #if spCOMPLEX
         if (Matrix->Complex) *piDeterminant = 0.0;
 #endif
@@ -939,29 +1033,24 @@ void spDeterminant(char* eMatrix, int* pExponent, RealNumber* pDeterminant)
 
 #if spCOMPLEX
     if (Matrix->Complex)        /* Complex Case. */
-    {
-        cDeterminant.Real = 1.0;
+    {   cDeterminant.Real = 1.0;
         cDeterminant.Imag = 0.0;
 
         while (++I <= Size)
-        {
-            CMPLX_RECIPROCAL( Pivot, *Matrix->Diag[I] );
+        {   CMPLX_RECIPROCAL( Pivot, *Matrix->Diag[I] );
             CMPLX_MULT_ASSIGN( cDeterminant, Pivot );
 
-            /* Scale Determinant. */
+/* Scale Determinant. */
             Norm = NORM( cDeterminant );
             if (Norm != 0.0)
-            {
-                while (Norm >= 1.0e12)
-                {
-                    cDeterminant.Real *= 1.0e-12;
+            {   while (Norm >= 1.0e12)
+                {   cDeterminant.Real *= 1.0e-12;
                     cDeterminant.Imag *= 1.0e-12;
                     *pExponent += 12;
                     Norm = NORM( cDeterminant );
                 }
                 while (Norm < 1.0e-12)
-                {
-                    cDeterminant.Real *= 1.0e12;
+                {   cDeterminant.Real *= 1.0e12;
                     cDeterminant.Imag *= 1.0e12;
                     *pExponent -= 12;
                     Norm = NORM( cDeterminant );
@@ -969,20 +1058,17 @@ void spDeterminant(char* eMatrix, int* pExponent, RealNumber* pDeterminant)
             }
         }
 
-        /* Scale Determinant again, this time to be between 1.0 <= x < 10.0. */
+/* Scale Determinant again, this time to be between 1.0 <= x < 10.0. */
         Norm = NORM( cDeterminant );
         if (Norm != 0.0)
-        {
-            while (Norm >= 10.0)
-            {
-                cDeterminant.Real *= 0.1;
+        {   while (Norm >= 10.0)
+            {   cDeterminant.Real *= 0.1;
                 cDeterminant.Imag *= 0.1;
                 (*pExponent)++;
                 Norm = NORM( cDeterminant );
             }
             while (Norm < 1.0)
-            {
-                cDeterminant.Real *= 10.0;
+            {   cDeterminant.Real *= 10.0;
                 cDeterminant.Imag *= 10.0;
                 (*pExponent)--;
                 Norm = NORM( cDeterminant );
@@ -990,7 +1076,7 @@ void spDeterminant(char* eMatrix, int* pExponent, RealNumber* pDeterminant)
         }
         if (Matrix->NumberOfInterchangesIsOdd)
             CMPLX_NEGATE( cDeterminant );
-
+        
         *pDeterminant = cDeterminant.Real;
         *piDeterminant = cDeterminant.Imag;
     }
@@ -1003,36 +1089,29 @@ void spDeterminant(char* eMatrix, int* pExponent, RealNumber* pDeterminant)
         *pDeterminant = 1.0;
 
         while (++I <= Size)
-        {
-            *pDeterminant /= Matrix->Diag[I]->Real;
+        {   *pDeterminant /= Matrix->Diag[I]->Real;
 
-            /* Scale Determinant. */
+/* Scale Determinant. */
             if (*pDeterminant != 0.0)
-            {
-                while (ABS(*pDeterminant) >= 1.0e12)
-                {
-                    *pDeterminant *= 1.0e-12;
+            {   while (ABS(*pDeterminant) >= 1.0e12)
+                {   *pDeterminant *= 1.0e-12;
                     *pExponent += 12;
                 }
                 while (ABS(*pDeterminant) < 1.0e-12)
-                {
-                    *pDeterminant *= 1.0e12;
+                {   *pDeterminant *= 1.0e12;
                     *pExponent -= 12;
                 }
             }
         }
 
-        /* Scale Determinant again, this time to be between 1.0 <= x < 10.0. */
+/* Scale Determinant again, this time to be between 1.0 <= x < 10.0. */
         if (*pDeterminant != 0.0)
-        {
-            while (ABS(*pDeterminant) >= 10.0)
-            {
-                *pDeterminant *= 0.1;
+        {   while (ABS(*pDeterminant) >= 10.0)
+            {   *pDeterminant *= 0.1;
                 (*pExponent)++;
             }
             while (ABS(*pDeterminant) < 1.0)
-            {
-                *pDeterminant *= 10.0;
+            {   *pDeterminant *= 10.0;
                 (*pExponent)--;
             }
         }
@@ -1043,18 +1122,22 @@ void spDeterminant(char* eMatrix, int* pExponent, RealNumber* pDeterminant)
 }
 #endif /* DETERMINANT */
 
-#if STRIP
 
-/*
- *  STRIP FILL-INS FROM MATRIX
- *
+
+
+
+
+
+
+#if STRIP
+
+/*!
  *  Strips the matrix of all fill-ins.
  *
- *  >>> Arguments:
- *  Matrix  <input>  (char *)
+ *  \param eMatrix
  *      Pointer to the matrix to be stripped.
- *
- *  >>> Local variables:
+ */
+/*  >>> Local variables:
  *  pElement  (ElementPtr)
  *      Pointer that is used to step through the matrix.
  *  ppElement  (ElementPtr *)
@@ -1068,28 +1151,28 @@ void spDeterminant(char* eMatrix, int* pExponent, RealNumber* pDeterminant)
  *      A pointer to a node in the FillinList linked-list.
  */
 
-void spStripFills(char* eMatrix)
+void
+spStripFills( spMatrix eMatrix )
 {
-    MatrixPtr Matrix = (MatrixPtr)eMatrix;
-    struct FillinListNodeStruct  *pListNode;
+MatrixPtr  Matrix = (MatrixPtr)eMatrix;
+struct FillinListNodeStruct  *pListNode;
 
-    /* Begin `spStripFills'. */
-    ASSERT( IS_SPARSE( Matrix ) );
+/* Begin `spStripFills'. */
+    ASSERT_IS_SPARSE( Matrix );
     if (Matrix->Fillins == 0) return;
     Matrix->NeedsOrdering = YES;
     Matrix->Elements -= Matrix->Fillins;
     Matrix->Fillins = 0;
 
-    /* Mark the fill-ins. */
-    {   ElementPtr  pFillin, pLastFillin;
+/* Mark the fill-ins. */
+    {   register  ElementPtr  pFillin, pLastFillin;
 
         pListNode = Matrix->LastFillinListNode = Matrix->FirstFillinListNode;
         Matrix->FillinsRemaining = pListNode->NumberOfFillinsInList;
         Matrix->NextAvailFillin = pListNode->pFillinList;
 
         while (pListNode != NULL)
-        {
-            pFillin = pListNode->pFillinList;
+        {   pFillin = pListNode->pFillinList;
             pLastFillin = &(pFillin[ pListNode->NumberOfFillinsInList - 1 ]);
             while (pFillin <= pLastFillin)
                 (pFillin++)->Row = 0;
@@ -1097,20 +1180,16 @@ void spStripFills(char* eMatrix)
         }
     }
 
-    /* Unlink fill-ins by searching for elements marked with Row = 0. */
-    {
-        ElementPtr pElement, *ppElement;
-        int I, Size = Matrix->Size;
+/* Unlink fill-ins by searching for elements marked with Row = 0. */
+    {   register  ElementPtr pElement, *ppElement;
+        register  int  I, Size = Matrix->Size;
 
-        /* Unlink fill-ins in all columns. */
+/* Unlink fill-ins in all columns. */
         for (I = 1; I <= Size; I++)
-        {
-            ppElement = &(Matrix->FirstInCol[I]);
+        {   ppElement = &(Matrix->FirstInCol[I]);
             while ((pElement = *ppElement) != NULL)
-            {
-                if (pElement->Row == 0)
-                {
-                    *ppElement = pElement->NextInCol;  /* Unlink fill-in. */
+            {   if (pElement->Row == 0)
+                {   *ppElement = pElement->NextInCol;  /* Unlink fill-in. */
                     if (Matrix->Diag[pElement->Col] == pElement)
                         Matrix->Diag[pElement->Col] = NULL;
                 }
@@ -1119,13 +1198,11 @@ void spStripFills(char* eMatrix)
             }
         }
 
-        /* Unlink fill-ins in all rows. */
+/* Unlink fill-ins in all rows. */
         for (I = 1; I <= Size; I++)
-        {
-            ppElement = &(Matrix->FirstInRow[I]);
+        {   ppElement = &(Matrix->FirstInRow[I]);
             while ((pElement = *ppElement) != NULL)
-            {
-                if (pElement->Row == 0)
+            {   if (pElement->Row == 0)
                     *ppElement = pElement->NextInRow;  /* Unlink fill-in. */
                 else
                     ppElement = &pElement->NextInRow;  /* Skip element. */
@@ -1136,24 +1213,27 @@ void spStripFills(char* eMatrix)
 }
 #endif
 
+
+
+
+
+
+
 #if TRANSLATE AND DELETE
-/*
- *  DELETE A ROW AND COLUMN FROM THE MATRIX
- *
+/*!
  *  Deletes a row and a column from a matrix.
  *
  *  Sparse will abort if an attempt is made to delete a row or column that
  *  doesn't exist.
  *
- *  >>> Arguments:
- *  eMatrix  <input>  (char *)
+ *  \param eMatrix
  *      Pointer to the matrix in which the row and column are to be deleted.
- *  Row  <input>  (int)
+ *  \param Row
  *      Row to be deleted.
- *  Col  <input>  (int)
+ *  \param Col
  *      Column to be deleted.
- *
- *  >>> Local variables:
+ */
+/*  >>> Local variables:
  *  ExtCol  (int)
  *      The external column that is being deleted.
  *  ExtRow  (int)
@@ -1171,16 +1251,22 @@ void spStripFills(char* eMatrix)
  *      The local version Matrix->Size, the size of the matrix.
  */
 
-void spDeleteRowAndCol(char* eMatrix, int Row, int Col)
+void
+spDeleteRowAndCol(
+    spMatrix eMatrix,
+    int  Row,
+    int  Col
+)
 {
-    MatrixPtr Matrix = (MatrixPtr)eMatrix;
-    ElementPtr pElement, *ppElement, pLastElement;
-    int Size, ExtRow, ExtCol;
+MatrixPtr  Matrix = (MatrixPtr)eMatrix;
+register  ElementPtr  pElement, *ppElement, pLastElement;
+int  Size, ExtRow, ExtCol;
 
-    /* Begin `spDeleteRowAndCol'. */
-
-    ASSERT( IS_SPARSE(Matrix) AND Row > 0 AND Col > 0 );
-    ASSERT( Row <= Matrix->ExtSize AND Col <= Matrix->ExtSize );
+/* Begin `spDeleteRowAndCol'. */
+    ASSERT_IS_SPARSE( Matrix );
+    vASSERT( (Row > 0) AND (Col > 0), "Nonpositive row or column number" );
+    vASSERT( (Row <= Matrix->ExtSize) AND (Col <= Matrix->ExtSize),
+	     "Row or column number too large" );
 
     Size = Matrix->Size;
     ExtRow = Row;
@@ -1191,34 +1277,29 @@ void spDeleteRowAndCol(char* eMatrix, int Row, int Col)
     Col = Matrix->ExtToIntColMap[Col];
     ASSERT( Row > 0 AND Col > 0 );
 
-    /* Move Row so that it is the last row in the matrix. */
+/* Move Row so that it is the last row in the matrix. */
     if (Row != Size) spcRowExchange( Matrix, Row, Size );
 
-    /* Move Col so that it is the last column in the matrix. */
+/* Move Col so that it is the last column in the matrix. */
     if (Col != Size) spcColExchange( Matrix, Col, Size );
 
-    /* Correct Diag pointers. */
+/* Correct Diag pointers. */
     if (Row == Col)
         SWAP( ElementPtr, Matrix->Diag[Row], Matrix->Diag[Size] )
     else
-    {
-        Matrix->Diag[Row] = spcFindElementInCol( Matrix, Matrix->FirstInCol+Row,
-                                                Row, Row, NO );
-        Matrix->Diag[Col] = spcFindElementInCol( Matrix, Matrix->FirstInCol+Col,
-                                                Col, Col, NO );
+    {   Matrix->Diag[Row] = spcFindDiag( Matrix, Row );
+	Matrix->Diag[Col] = spcFindDiag( Matrix, Col );
     }
 
-    /*
+/*
  * Delete last row and column of the matrix.
  */
-    /* Break the column links to every element in the last row. */
+/* Break the column links to every element in the last row. */
     pLastElement = Matrix->FirstInRow[ Size ];
     while (pLastElement != NULL)
-    {
-        ppElement = &(Matrix->FirstInCol[ pLastElement->Col ]);
+    {   ppElement = &(Matrix->FirstInCol[ pLastElement->Col ]);
         while ((pElement = *ppElement) != NULL)
-        {
-            if (pElement == pLastElement)
+        {   if (pElement == pLastElement)
                 *ppElement = NULL;  /* Unlink last element in column. */
             else
                 ppElement = &pElement->NextInCol;  /* Skip element. */
@@ -1226,14 +1307,12 @@ void spDeleteRowAndCol(char* eMatrix, int Row, int Col)
         pLastElement = pLastElement->NextInRow;
     }
 
-    /* Break the row links to every element in the last column. */
+/* Break the row links to every element in the last column. */
     pLastElement = Matrix->FirstInCol[ Size ];
     while (pLastElement != NULL)
-    {
-        ppElement = &(Matrix->FirstInRow[ pLastElement->Row ]);
+    {   ppElement = &(Matrix->FirstInRow[ pLastElement->Row ]);
         while ((pElement = *ppElement) != NULL)
-        {
-            if (pElement == pLastElement)
+        {   if (pElement == pLastElement)
                 *ppElement = NULL;  /* Unlink last element in row. */
             else
                 ppElement = &pElement->NextInRow;  /* Skip element. */
@@ -1241,7 +1320,7 @@ void spDeleteRowAndCol(char* eMatrix, int Row, int Col)
         pLastElement = pLastElement->NextInCol;
     }
 
-    /* Clean up some details. */
+/* Clean up some details. */
     Matrix->Size = Size - 1;
     Matrix->Diag[Size] = NULL;
     Matrix->FirstInRow[Size] = NULL;
@@ -1250,13 +1329,20 @@ void spDeleteRowAndCol(char* eMatrix, int Row, int Col)
     Matrix->ExtToIntRowMap[ExtRow] = -1;
     Matrix->ExtToIntColMap[ExtCol] = -1;
     Matrix->NeedsOrdering = YES;
+
+    return;
 }
 #endif
 
+
+
+
+
+
+
+
 #if PSEUDOCONDITION
-/*
- *  CALCULATE PSEUDOCONDITION
- *
+/*!
  *  Computes the magnitude of the ratio of the largest to the smallest
  *  pivots.  This quantity is an indicator of ill-conditioning in the
  *  matrix.  If this ratio is large, and if the matrix is scaled such
@@ -1269,47 +1355,52 @@ void spDeleteRowAndCol(char* eMatrix, int Row, int Col)
  *  faster to compute than the condition number calculated by
  *  spCondition(), but is not as informative.
  *
- *  >>> Returns:
+ *  \return
  *  The magnitude of the ratio of the largest to smallest pivot used during
  *  previous factorization.  If the matrix was singular, zero is returned.
  *
- *  >>> Arguments:
- *  eMatrix  <input>  (char *)
+ *  \param eMatrix
  *      Pointer to the matrix.
  */
 
-RealNumber spPseudoCondition(char* eMatrix)
+spREAL
+spPseudoCondition( spMatrix eMatrix )
 {
-    MatrixPtr Matrix = (MatrixPtr)eMatrix;
-    int I;
-    ArrayOfElementPtrs Diag;
+    MatrixPtr  Matrix = (MatrixPtr)eMatrix;
+    register int I;
+    register ArrayOfElementPtrs Diag;
     RealNumber MaxPivot, MinPivot, Mag;
 
     /* Begin `spPseudoCondition'. */
-
-    ASSERT( IS_SPARSE(Matrix) AND IS_FACTORED(Matrix) );
+    ASSERT_IS_SPARSE( Matrix );
+    ASSERT_NO_ERRORS( Matrix );
+    ASSERT_IS_FACTORED( Matrix );
     if (Matrix->Error == spSINGULAR OR Matrix->Error == spZERO_DIAG)
-        return 0.0;
+	return 0.0;
 
     Diag = Matrix->Diag;
     MaxPivot = MinPivot = ELEMENT_MAG( Diag[1] );
     for (I = 2; I <= Matrix->Size; I++)
-    {
-        Mag = ELEMENT_MAG( Diag[I] );
-        if (Mag > MaxPivot)
-            MaxPivot = Mag;
-        else if (Mag < MinPivot)
-            MinPivot = Mag;
+    {   Mag = ELEMENT_MAG( Diag[I] );
+	if (Mag > MaxPivot)
+	    MaxPivot = Mag;
+	else if (Mag < MinPivot)
+	    MinPivot = Mag;
     }
-    ASSERT( MaxPivot > 0.0);
+    ASSERT( MaxPivot > 0.0 );
     return MaxPivot / MinPivot;
 }
 #endif
 
+
+
+
+
+
+
+
 #if CONDITION
-/*
- *  ESTIMATE CONDITION NUMBER
- *
+/*!
  *  Computes an estimate of the condition number using a variation on
  *  the LINPACK condition number estimation algorithm.  This quantity is
  *  an indicator of ill-conditioning in the matrix.  To avoid problems
@@ -1326,60 +1417,62 @@ RealNumber spPseudoCondition(char* eMatrix)
  *  Sparse placing ones on the diagonal of the upper triangular matrix
  *  rather than the lower.  This difference should be of no importance.
  *
- *  References:
+ *  \b References:
+ *
  *  A.K. Cline, C.B. Moler, G.W. Stewart, J.H. Wilkinson.  An estimate
  *  for the condition number of a matrix.  SIAM Journal on Numerical
  *  Analysis.  Vol. 16, No. 2, pages 368-375, April 1979.
- *
+ *  
  *  J.J. Dongarra, C.B. Moler, J.R. Bunch, G.W. Stewart.  LINPACK
  *  User's Guide.  SIAM, 1979.
- *
+ *  
  *  Roger G. Grimes, John G. Lewis.  Condition number estimation for
  *  sparse matrices.  SIAM Journal on Scientific and Statistical
  *  Computing.  Vol. 2, No. 4, pages 384-388, December 1981.
- *
+ *  
  *  Dianne Prost O'Leary.  Estimating matrix condition numbers.  SIAM
  *  Journal on Scientific and Statistical Computing.  Vol. 1, No. 2,
  *  pages 205-209, June 1980.
  *
- *  >>> Returns:
+ *  \return
  *  The reciprocal of the condition number.  If the matrix was singular,
  *  zero is returned.
  *
- *  >>> Arguments:
- *  eMatrix  <input>  (char *)
+ *  \param eMatrix
  *      Pointer to the matrix.
- *  NormOfMatrix  <input>  (RealNumber)
+ *  \param NormOfMatrix
  *      The L-infinity norm of the unfactored matrix as computed by
  *      spNorm().
- *  pError  <output>  (int *)
- *      Used to return error code.
- *
- *  >>> Possible errors:
- *  spSINGULAR
- *  spNO_MEMORY
+ *  \param pError
+ *      Used to return error code.  Possible errors include \a spSINGULAR
+ *      or \a spNO_MEMORY.
  */
 
-RealNumber spCondition(char* eMatrix, RealNumber NormOfMatrix, int *pError)
+spREAL
+spCondition( 
+    spMatrix eMatrix,
+    spREAL NormOfMatrix,
+    int *pError
+)
 {
-    MatrixPtr  Matrix = (MatrixPtr)eMatrix;
-    ElementPtr pElement;
-    RealVector T, Tm;
-    int I, K, Row;
-    ElementPtr pPivot;
-    int Size;
-    RealNumber E, Em, Wp, Wm, ASp, ASm, ASw, ASy, ASv, ASz, MaxY, ScaleFactor;
-    RealNumber Linpack, OLeary, InvNormOfInverse;
+MatrixPtr  Matrix = (MatrixPtr)eMatrix;
+register ElementPtr pElement;
+register RealVector T, Tm;
+register int I, K, Row;
+ElementPtr pPivot;
+int Size;
+RealNumber E, Em, Wp, Wm, ASp, ASm, ASw, ASy, ASv, ASz, MaxY, ScaleFactor;
+RealNumber Linpack, OLeary, InvNormOfInverse, ComplexCondition();
 #define SLACK   1e4
 
-    /* Begin `spCondition'. */
-
-    ASSERT( IS_SPARSE(Matrix) AND IS_FACTORED(Matrix) );
+/* Begin `spCondition'. */
+    ASSERT_IS_SPARSE( Matrix );
+    ASSERT_NO_ERRORS( Matrix );
+    ASSERT_IS_FACTORED( Matrix );
     *pError = Matrix->Error;
     if (Matrix->Error >= spFATAL) return 0.0;
     if (NormOfMatrix == 0.0)
-    {
-        *pError = spSINGULAR;
+    {   *pError = spSINGULAR;
         return 0.0;
     }
 
@@ -1396,30 +1489,27 @@ RealNumber spCondition(char* eMatrix, RealNumber NormOfMatrix, int *pError)
 #else
     Tm = ALLOC( RealNumber, Size+1 );
     if (Tm == NULL)
-    {
-        *pError = spNO_MEMORY;
+    {   *pError = spNO_MEMORY;
         return 0.0;
     }
 #endif
     for (I = Size; I > 0; I--) T[I] = 0.0;
 
-    /*
+/*
  * Part 1.  Ay = e.
  * Solve Ay = LUy = e where e consists of +1 and -1 terms with the sign
  * chosen to maximize the size of w in Lw = e.  Since the terms in w can
  * get very large, scaling is used to avoid overflow.
  */
 
-    /* Forward elimination. Solves Lw = e while choosing e. */
+/* Forward elimination. Solves Lw = e while choosing e. */
     E = 1.0;
     for (I = 1; I <= Size; I++)
-    {
-        pPivot = Matrix->Diag[I];
+    {   pPivot = Matrix->Diag[I];
         if (T[I] < 0.0) Em = -E; else Em = E;
         Wm = (Em + T[I]) * pPivot->Real;
         if (ABS(Wm) > SLACK)
-        {
-            ScaleFactor = 1.0 / MAX( SQR( SLACK ), ABS(Wm) );
+        {   ScaleFactor = 1.0 / MAX( SQR( SLACK ), ABS(Wm) );
             for (K = Size; K > 0; K--) T[K] *= ScaleFactor;
             E *= ScaleFactor;
             Em *= ScaleFactor;
@@ -1429,11 +1519,10 @@ RealNumber spCondition(char* eMatrix, RealNumber NormOfMatrix, int *pError)
         ASp = ABS(T[I] - Em);
         ASm = ABS(Em + T[I]);
 
-        /* Update T for both values of W, minus value is placed in Tm. */
+/* Update T for both values of W, minus value is placed in Tm. */
         pElement = pPivot->NextInCol;
         while (pElement != NULL)
-        {
-            Row = pElement->Row;
+        {   Row = pElement->Row;
             Tm[Row] = T[Row] - (Wm * pElement->Real);
             T[Row] -= (Wp * pElement->Real);
             ASp += ABS(T[Row]);
@@ -1441,111 +1530,97 @@ RealNumber spCondition(char* eMatrix, RealNumber NormOfMatrix, int *pError)
             pElement = pElement->NextInCol;
         }
 
-        /* If minus value causes more growth, overwrite T with its values. */
+/* If minus value causes more growth, overwrite T with its values. */
         if (ASm > ASp)
-        {
-            T[I] = Wm;
+        {   T[I] = Wm;
             pElement = pPivot->NextInCol;
             while (pElement != NULL)
-            {
-                T[pElement->Row] = Tm[pElement->Row];
+            {   T[pElement->Row] = Tm[pElement->Row];
                 pElement = pElement->NextInCol;
             }
         }
         else T[I] = Wp;
     }
 
-    /* Compute 1-norm of T, which now contains w, and scale ||T|| to 1/SLACK. */
+/* Compute 1-norm of T, which now contains w, and scale ||T|| to 1/SLACK. */
     for (ASw = 0.0, I = Size; I > 0; I--) ASw += ABS(T[I]);
     ScaleFactor = 1.0 / (SLACK * ASw);
     if (ScaleFactor < 0.5)
-    {
-        for (I = Size; I > 0; I--) T[I] *= ScaleFactor;
+    {   for (I = Size; I > 0; I--) T[I] *= ScaleFactor;
         E *= ScaleFactor;
     }
 
-    /* Backward Substitution. Solves Uy = w.*/
+/* Backward Substitution. Solves Uy = w.*/
     for (I = Size; I >= 1; I--)
-    {
-        pElement = Matrix->Diag[I]->NextInRow;
+    {   pElement = Matrix->Diag[I]->NextInRow;
         while (pElement != NULL)
-        {
-            T[I] -= pElement->Real * T[pElement->Col];
+        {   T[I] -= pElement->Real * T[pElement->Col];
             pElement = pElement->NextInRow;
         }
         if (ABS(T[I]) > SLACK)
-        {
-            ScaleFactor = 1.0 / MAX( SQR( SLACK ), ABS(T[I]) );
+        {   ScaleFactor = 1.0 / MAX( SQR( SLACK ), ABS(T[I]) );
             for (K = Size; K > 0; K--) T[K] *= ScaleFactor;
             E *= ScaleFactor;
         }
     }
 
-    /* Compute 1-norm of T, which now contains y, and scale ||T|| to 1/SLACK. */
+/* Compute 1-norm of T, which now contains y, and scale ||T|| to 1/SLACK. */
     for (ASy = 0.0, I = Size; I > 0; I--) ASy += ABS(T[I]);
     ScaleFactor = 1.0 / (SLACK * ASy);
     if (ScaleFactor < 0.5)
-    {
-        for (I = Size; I > 0; I--) T[I] *= ScaleFactor;
+    {   for (I = Size; I > 0; I--) T[I] *= ScaleFactor;
         ASy = 1.0 / SLACK;
         E *= ScaleFactor;
     }
 
-    /* Compute infinity-norm of T for O'Leary's estimate. */
+/* Compute infinity-norm of T for O'Leary's estimate. */
     for (MaxY = 0.0, I = Size; I > 0; I--)
         if (MaxY < ABS(T[I])) MaxY = ABS(T[I]);
 
-    /*
+/*
  * Part 2.  A* z = y where the * represents the transpose.
  * Recall that A = LU implies A* = U* L*.
  */
 
-    /* Forward elimination, U* v = y. */
+/* Forward elimination, U* v = y. */
     for (I = 1; I <= Size; I++)
-    {
-        pElement = Matrix->Diag[I]->NextInRow;
+    {   pElement = Matrix->Diag[I]->NextInRow;
         while (pElement != NULL)
-        {
-            T[pElement->Col] -= T[I] * pElement->Real;
+        {   T[pElement->Col] -= T[I] * pElement->Real;
             pElement = pElement->NextInRow;
         }
         if (ABS(T[I]) > SLACK)
-        {
-            ScaleFactor = 1.0 / MAX( SQR( SLACK ), ABS(T[I]) );
+        {   ScaleFactor = 1.0 / MAX( SQR( SLACK ), ABS(T[I]) );
             for (K = Size; K > 0; K--) T[K] *= ScaleFactor;
             ASy *= ScaleFactor;
         }
     }
 
-    /* Compute 1-norm of T, which now contains v, and scale ||T|| to 1/SLACK. */
+/* Compute 1-norm of T, which now contains v, and scale ||T|| to 1/SLACK. */
     for (ASv = 0.0, I = Size; I > 0; I--) ASv += ABS(T[I]);
     ScaleFactor = 1.0 / (SLACK * ASv);
     if (ScaleFactor < 0.5)
-    {
-        for (I = Size; I > 0; I--) T[I] *= ScaleFactor;
+    {   for (I = Size; I > 0; I--) T[I] *= ScaleFactor;
         ASy *= ScaleFactor;
     }
 
-    /* Backward Substitution, L* z = v. */
+/* Backward Substitution, L* z = v. */
     for (I = Size; I >= 1; I--)
-    {
-        pPivot = Matrix->Diag[I];
+    {   pPivot = Matrix->Diag[I];
         pElement = pPivot->NextInCol;
         while (pElement != NULL)
-        {
-            T[I] -= pElement->Real * T[pElement->Row];
+        {   T[I] -= pElement->Real * T[pElement->Row];
             pElement = pElement->NextInCol;
         }
         T[I] *= pPivot->Real;
         if (ABS(T[I]) > SLACK)
-        {
-            ScaleFactor = 1.0 / MAX( SQR( SLACK ), ABS(T[I]) );
+        {   ScaleFactor = 1.0 / MAX( SQR( SLACK ), ABS(T[I]) );
             for (K = Size; K > 0; K--) T[K] *= ScaleFactor;
             ASy *= ScaleFactor;
         }
     }
 
-    /* Compute 1-norm of T, which now contains z. */
+/* Compute 1-norm of T, which now contains z. */
     for (ASz = 0.0, I = Size; I > 0; I--) ASz += ABS(T[I]);
 
 #if NOT spCOMPLEX
@@ -1558,6 +1633,10 @@ RealNumber spCondition(char* eMatrix, RealNumber NormOfMatrix, int *pError)
     return InvNormOfInverse / NormOfMatrix;
 #endif /* REAL */
 }
+
+
+
+
 
 #if spCOMPLEX
 /*
@@ -1581,49 +1660,51 @@ RealNumber spCondition(char* eMatrix, RealNumber NormOfMatrix, int *pError)
  *  spNO_MEMORY
  */
 
-/*static*/ RealNumber ComplexCondition(MatrixPtr Matrix, RealNumber NormOfMatrix, int* pError)
+static RealNumber
+ComplexCondition(
+    MatrixPtr Matrix,
+    RealNumber NormOfMatrix,
+    int *pError
+)
 {
-    ElementPtr pElement;
-    ComplexVector T, Tm;
-    int I, K, Row;
-    ElementPtr pPivot;
-    int Size;
-    RealNumber E, Em, ASp, ASm, ASw, ASy, ASv, ASz, MaxY, ScaleFactor;
-    RealNumber Linpack, OLeary, InvNormOfInverse;
-    ComplexNumber Wp, Wm;
+register ElementPtr pElement;
+register ComplexVector T, Tm;
+register int I, K, Row;
+ElementPtr pPivot;
+int Size;
+RealNumber E, Em, ASp, ASm, ASw, ASy, ASv, ASz, MaxY, ScaleFactor;
+RealNumber Linpack, OLeary, InvNormOfInverse;
+ComplexNumber Wp, Wm;
 
-    /* Begin `ComplexCondition'. */
+/* Begin `ComplexCondition'. */
 
     Size = Matrix->Size;
     T = (ComplexVector)Matrix->Intermediate;
     Tm = ALLOC( ComplexNumber, Size+1 );
     if (Tm == NULL)
-    {
-        *pError = spNO_MEMORY;
+    {   *pError = spNO_MEMORY;
         return 0.0;
     }
     for (I = Size; I > 0; I--) T[I].Real = T[I].Imag = 0.0;
 
-    /*
+/*
  * Part 1.  Ay = e.
  * Solve Ay = LUy = e where e consists of +1 and -1 terms with the sign
  * chosen to maximize the size of w in Lw = e.  Since the terms in w can
  * get very large, scaling is used to avoid overflow.
  */
 
-    /* Forward elimination. Solves Lw = e while choosing e. */
+/* Forward elimination. Solves Lw = e while choosing e. */
     E = 1.0;
     for (I = 1; I <= Size; I++)
-    {
-        pPivot = Matrix->Diag[I];
+    {   pPivot = Matrix->Diag[I];
         if (T[I].Real < 0.0) Em = -E; else Em = E;
         Wm = T[I];
         Wm.Real += Em;
         ASm = CMPLX_1_NORM( Wm );
         CMPLX_MULT_ASSIGN( Wm, *pPivot );
         if (CMPLX_1_NORM(Wm) > SLACK)
-        {
-            ScaleFactor = 1.0 / MAX( SQR( SLACK ), CMPLX_1_NORM(Wm) );
+        {   ScaleFactor = 1.0 / MAX( SQR( SLACK ), CMPLX_1_NORM(Wm) );
             for (K = Size; K > 0; K--) SCLR_MULT_ASSIGN( T[K], ScaleFactor );
             E *= ScaleFactor;
             Em *= ScaleFactor;
@@ -1635,11 +1716,10 @@ RealNumber spCondition(char* eMatrix, RealNumber NormOfMatrix, int *pError)
         ASp = CMPLX_1_NORM( Wp );
         CMPLX_MULT_ASSIGN( Wp, *pPivot );
 
-        /* Update T for both values of W, minus value is placed in Tm. */
+/* Update T for both values of W, minus value is placed in Tm. */
         pElement = pPivot->NextInCol;
         while (pElement != NULL)
-        {
-            Row = pElement->Row;
+        {   Row = pElement->Row;
             /* Cmplx expr: Tm[Row] = T[Row] - (Wp * *pElement). */
             CMPLX_MULT_SUBT( Tm[Row], Wm, *pElement, T[Row] );
             /* Cmplx expr: T[Row] -= Wp * *pElement. */
@@ -1649,97 +1729,85 @@ RealNumber spCondition(char* eMatrix, RealNumber NormOfMatrix, int *pError)
             pElement = pElement->NextInCol;
         }
 
-        /* If minus value causes more growth, overwrite T with its values. */
+/* If minus value causes more growth, overwrite T with its values. */
         if (ASm > ASp)
-        {
-            T[I] = Wm;
+        {   T[I] = Wm;
             pElement = pPivot->NextInCol;
             while (pElement != NULL)
-            {
-                T[pElement->Row] = Tm[pElement->Row];
+            {   T[pElement->Row] = Tm[pElement->Row];
                 pElement = pElement->NextInCol;
             }
         }
         else T[I] = Wp;
     }
 
-    /* Compute 1-norm of T, which now contains w, and scale ||T|| to 1/SLACK. */
+/* Compute 1-norm of T, which now contains w, and scale ||T|| to 1/SLACK. */
     for (ASw = 0.0, I = Size; I > 0; I--) ASw += CMPLX_1_NORM(T[I]);
     ScaleFactor = 1.0 / (SLACK * ASw);
     if (ScaleFactor < 0.5)
-    {
-        for (I = Size; I > 0; I--) SCLR_MULT_ASSIGN( T[I], ScaleFactor );
+    {   for (I = Size; I > 0; I--) SCLR_MULT_ASSIGN( T[I], ScaleFactor );
         E *= ScaleFactor;
     }
 
-    /* Backward Substitution. Solves Uy = w.*/
+/* Backward Substitution. Solves Uy = w.*/
     for (I = Size; I >= 1; I--)
-    {
-        pElement = Matrix->Diag[I]->NextInRow;
+    {   pElement = Matrix->Diag[I]->NextInRow;
         while (pElement != NULL)
         {   /* Cmplx expr: T[I] -= T[pElement->Col] * *pElement. */
-
             CMPLX_MULT_SUBT_ASSIGN( T[I], T[pElement->Col], *pElement );
             pElement = pElement->NextInRow;
         }
         if (CMPLX_1_NORM(T[I]) > SLACK)
-        {
-            ScaleFactor = 1.0 / MAX( SQR( SLACK ), CMPLX_1_NORM(T[I]) );
+        {   ScaleFactor = 1.0 / MAX( SQR( SLACK ), CMPLX_1_NORM(T[I]) );
             for (K = Size; K > 0; K--) SCLR_MULT_ASSIGN( T[K], ScaleFactor );
             E *= ScaleFactor;
         }
     }
 
-    /* Compute 1-norm of T, which now contains y, and scale ||T|| to 1/SLACK. */
+/* Compute 1-norm of T, which now contains y, and scale ||T|| to 1/SLACK. */
     for (ASy = 0.0, I = Size; I > 0; I--) ASy += CMPLX_1_NORM(T[I]);
     ScaleFactor = 1.0 / (SLACK * ASy);
     if (ScaleFactor < 0.5)
-    {
-        for (I = Size; I > 0; I--) SCLR_MULT_ASSIGN( T[I], ScaleFactor );
+    {   for (I = Size; I > 0; I--) SCLR_MULT_ASSIGN( T[I], ScaleFactor );
         ASy = 1.0 / SLACK;
         E *= ScaleFactor;
     }
 
-    /* Compute infinity-norm of T for O'Leary's estimate. */
+/* Compute infinity-norm of T for O'Leary's estimate. */
     for (MaxY = 0.0, I = Size; I > 0; I--)
         if (MaxY < CMPLX_1_NORM(T[I])) MaxY = CMPLX_1_NORM(T[I]);
 
-    /*
+/*
  * Part 2.  A* z = y where the * represents the transpose.
  * Recall that A = LU implies A* = U* L*.
  */
 
-    /* Forward elimination, U* v = y. */
+/* Forward elimination, U* v = y. */
     for (I = 1; I <= Size; I++)
-    {
-        pElement = Matrix->Diag[I]->NextInRow;
+    {   pElement = Matrix->Diag[I]->NextInRow;
         while (pElement != NULL)
         {   /* Cmplx expr: T[pElement->Col] -= T[I] * *pElement. */
-
             CMPLX_MULT_SUBT_ASSIGN( T[pElement->Col], T[I], *pElement );
             pElement = pElement->NextInRow;
         }
         if (CMPLX_1_NORM(T[I]) > SLACK)
-        {
-            ScaleFactor = 1.0 / MAX( SQR( SLACK ), CMPLX_1_NORM(T[I]) );
+        {   ScaleFactor = 1.0 / MAX( SQR( SLACK ), CMPLX_1_NORM(T[I]) );
             for (K = Size; K > 0; K--) SCLR_MULT_ASSIGN( T[K], ScaleFactor );
             ASy *= ScaleFactor;
         }
     }
 
-    /* Compute 1-norm of T, which now contains v, and scale ||T|| to 1/SLACK. */
+/* Compute 1-norm of T, which now contains v, and scale ||T|| to 1/SLACK. */
     for (ASv = 0.0, I = Size; I > 0; I--) ASv += CMPLX_1_NORM(T[I]);
     ScaleFactor = 1.0 / (SLACK * ASv);
     if (ScaleFactor < 0.5)
-    {
-        for (I = Size; I > 0; I--) SCLR_MULT_ASSIGN( T[I], ScaleFactor );
+    {   for (I = Size; I > 0; I--) SCLR_MULT_ASSIGN( T[I], ScaleFactor );
         ASy *= ScaleFactor;
     }
 
-    /* Backward Substitution, L* z = v. */
+/* Backward Substitution, L* z = v. */
     for (I = Size; I >= 1; I--)
-    {
-        pPivot = Matrix->Diag[I];
+    {   pPivot = Matrix->Diag[I];
         pElement = pPivot->NextInCol;
         while (pElement != NULL)
         {   /* Cmplx expr: T[I] -= T[pElement->Row] * *pElement. */
@@ -1748,14 +1816,13 @@ RealNumber spCondition(char* eMatrix, RealNumber NormOfMatrix, int *pError)
         }
         CMPLX_MULT_ASSIGN( T[I], *pPivot );
         if (CMPLX_1_NORM(T[I]) > SLACK)
-        {
-            ScaleFactor = 1.0 / MAX( SQR( SLACK ), CMPLX_1_NORM(T[I]) );
+        {   ScaleFactor = 1.0 / MAX( SQR( SLACK ), CMPLX_1_NORM(T[I]) );
             for (K = Size; K > 0; K--) SCLR_MULT_ASSIGN( T[K], ScaleFactor );
             ASy *= ScaleFactor;
         }
     }
 
-    /* Compute 1-norm of T, which now contains z. */
+/* Compute 1-norm of T, which now contains z. */
     for (ASz = 0.0, I = Size; I > 0; I--) ASz += CMPLX_1_NORM(T[I]);
 
     FREE( Tm );
@@ -1767,44 +1834,43 @@ RealNumber spCondition(char* eMatrix, RealNumber NormOfMatrix, int *pError)
 }
 #endif /* spCOMPLEX */
 
-/*
- *  L-INFINITY MATRIX NORM
- *
+
+
+
+
+/*!
  *  Computes the L-infinity norm of an unfactored matrix.  It is a fatal
  *  error to pass this routine a factored matrix.
  *
- *  One difficulty is that the rows may not be linked.
- *
- *  >>> Returns:
+ *  \return
  *  The largest absolute row sum of matrix.
  *
- *  >>> Arguments:
- *  eMatrix  <input>  (char *)
+ *  \param eMatrix
  *      Pointer to the matrix.
  */
 
-RealNumber spNorm(char* eMatrix)
+spREAL
+spNorm( spMatrix eMatrix )
 {
-    MatrixPtr Matrix = (MatrixPtr)eMatrix;
-    ElementPtr pElement;
-    int I;
-    RealNumber Max = 0.0, AbsRowSum;
+MatrixPtr  Matrix = (MatrixPtr)eMatrix;
+register ElementPtr pElement;
+register int I;
+RealNumber Max = 0.0, AbsRowSum;
 
-    /* Begin `spNorm'. */
-    ASSERT( IS_SPARSE(Matrix) AND NOT IS_FACTORED(Matrix) );
+/* Begin `spNorm'. */
+    ASSERT_IS_SPARSE( Matrix );
+    ASSERT_NO_ERRORS( Matrix );
+    ASSERT_IS_NOT_FACTORED( Matrix );
     if (NOT Matrix->RowsLinked) spcLinkRows( Matrix );
 
 /* Compute row sums. */
 #if REAL
     if (NOT Matrix->Complex)
-    {
-        for (I = Matrix->Size; I > 0; I--)
-        {
-            pElement = Matrix->FirstInRow[I];
+    {   for (I = Matrix->Size; I > 0; I--)
+        {   pElement = Matrix->FirstInRow[I];
             AbsRowSum = 0.0;
             while (pElement != NULL)
-            {
-                AbsRowSum += ABS( pElement->Real );
+            {   AbsRowSum += ABS( pElement->Real );
                 pElement = pElement->NextInRow;
             }
             if (Max < AbsRowSum) Max = AbsRowSum;
@@ -1814,12 +1880,10 @@ RealNumber spNorm(char* eMatrix)
 #if spCOMPLEX
     if (Matrix->Complex)
     {   for (I = Matrix->Size; I > 0; I--)
-        {
-            pElement = Matrix->FirstInRow[I];
+        {   pElement = Matrix->FirstInRow[I];
             AbsRowSum = 0.0;
             while (pElement != NULL)
-            {
-                AbsRowSum += CMPLX_1_NORM( *pElement );
+            {   AbsRowSum += CMPLX_1_NORM( *pElement );
                 pElement = pElement->NextInRow;
             }
             if (Max < AbsRowSum) Max = AbsRowSum;
@@ -1830,28 +1894,35 @@ RealNumber spNorm(char* eMatrix)
 }
 #endif /* CONDITION */
 
+
+
+
+
+
 #if STABILITY
-/*
- *  STABILITY OF FACTORIZATION
- *
- *  The following routines are used to gauge the stability of a
+/*!
+ *  This routine, along with spRoundoff(), are used to gauge the stability of a
  *  factorization.  If the factorization is determined to be too unstable,
  *  then the matrix should be reordered.  The routines compute quantities
  *  that are needed in the computation of a bound on the error attributed
  *  to any one element in the matrix during the factorization.  In other
- *  words, there is a matrix E = [e_ij] of error terms such that A+E = LU.
- *  This routine finds a bound on |e_ij|.  Erisman & Reid [1] showed that
- *  |e_ij| < 3.01 u rho m_ij, where u is the machine rounding unit,
- *  rho = max a_ij where the max is taken over every row i, column j, and
- *  step k, and m_ij is the number of multiplications required in the
- *  computation of l_ij if i > j or u_ij otherwise.  Barlow [2] showed that
- *  rho < max_i || l_i ||_p max_j || u_j ||_q where 1/p + 1/q = 1.
+ *  words, there is a matrix \f$ E = [e_{ij}] \f$ of error terms such that
+ *  \f$ A+E = LU \f$.  This routine finds a bound on \f$ |e_{ij}| \f$.
+ *  Erisman & Reid [1] showed that \f$ |e_{ij}| < 3.01 u \rho m_{ij} \f$,
+ *  where \f$ u \f$ is the machine rounding unit,
+ *  \f$ \rho = \max a_{ij} \f$ where the max is taken over every row \f$ i \f$,
+ *  column \f$ j \f$, and step \f$ k \f$, and \f$ m_{ij} \f$ is the number
+ *  of multiplications required in the computation of \f$ l_{ij} \f$ if
+ *  \f$ i > j \f$ or \f$ u_{ij} \f$ otherwise.  Barlow [2] showed that
+ *  \f$ \rho < \max_i || l_i ||_p \max_j || u_j ||_q \f$ where
+ *  \f$ 1/p + 1/q = 1 \f$.
  *
- *  The first routine finds the magnitude on the largest element in the
+ *  spLargestElement() finds the magnitude on the largest element in the
  *  matrix.  If the matrix has not yet been factored, the largest
  *  element is found by direct search.  If the matrix is factored, a
  *  bound on the largest element in any of the reduced submatrices is
- *  computed using Barlow with p = oo and q = 1.  The ratio of these
+ *  computed using Barlow with \f$ p = \infty \f$ and \f$ q = 1 \f$.
+ *  The ratio of these
  *  two numbers is the growth, which can be used to determine if the
  *  pivoting order is adequate.  A large growth implies that
  *  considerable error has been made in the factorization and that it
@@ -1861,14 +1932,15 @@ RealNumber spNorm(char* eMatrix)
  *  encountered after using spOrderAndFactor(), refactor using
  *  spOrderAndFactor() with the pivot threshold increased, say to 0.1.
  *
- *  Using only the size of the matrix as an upper bound on m_ij and
+ *  Using only the size of the matrix as an upper bound on \f$ m_{ij} \f$ and
  *  Barlow's bound, the user can estimate the size of the matrix error
- *  terms e_ij using the bound of Erisman and Reid.  The second routine
+ *  terms \f$ e_{ij} \f$ using the bound of Erisman and Reid.  spRoundoff() 
  *  computes a tighter bound (with more work) based on work by Gear
- *  [3], |e_ij| < 1.01 u rho (t c^3 + (1 + t)c^2) where t is the
- *  threshold and c is the maximum number of off-diagonal elements in
- *  any row of L.  The expensive part of computing this bound is
- *  determining the maximum number of off-diagonals in L, which changes
+ *  [3], \f$ |e_{ij}| < 1.01 u \rho (t c^3 + (1 + t)c^2) \f$ where
+ *  \f$ t \f$ is the threshold and \f$ c \f$ is the maximum number of
+ *  off-diagonal elements in any row of \f$ L \f$.  The expensive part
+ *  of computing this bound is determining the maximum number of
+ *  off-diagonals in \f$ L \f$, which changes
  *  only when the order of the matrix changes.  This number is computed
  *  and saved, and only recomputed if the matrix is reordered.
  *
@@ -1882,61 +1954,53 @@ RealNumber spNorm(char* eMatrix)
  *
  *  [3] I. S. Duff, A. M. Erisman, J. K. Reid.  "Direct Methods for Sparse
  *      Matrices."  Oxford 1986. pp 99.
- */
-
-/*
- *  LARGEST ELEMENT IN MATRIX
  *
- *  >>> Returns:
+ *  \return
  *  If matrix is not factored, returns the magnitude of the largest element in
  *  the matrix.  If the matrix is factored, a bound on the magnitude of the
  *  largest element in any of the reduced submatrices is returned.
  *
- *  >>> Arguments:
- *  eMatrix  <input>  (char *)
+ *  \param eMatrix
  *      Pointer to the matrix.
  */
 
-RealNumber spLargestElement(char* eMatrix)
+spREAL
+spLargestElement( spMatrix eMatrix )
 {
-    MatrixPtr  Matrix = (MatrixPtr)eMatrix;
-    int I;
-    RealNumber Mag, AbsColSum, Max = 0.0, MaxRow = 0.0, MaxCol = 0.0;
-    RealNumber Pivot;
-    ComplexNumber cPivot;
-    ElementPtr pElement, pDiag;
+MatrixPtr  Matrix = (MatrixPtr)eMatrix;
+register int I;
+RealNumber Mag, AbsColSum, Max = 0.0, MaxRow = 0.0, MaxCol = 0.0;
+RealNumber Pivot;
+ComplexNumber cPivot;
+register ElementPtr pElement, pDiag;
 
-    /* Begin `spLargestElement'. */
-    ASSERT( IS_SPARSE(Matrix) );
+/* Begin `spLargestElement'. */
+    ASSERT_IS_SPARSE( Matrix );
 
 #if REAL
     if (Matrix->Factored AND NOT Matrix->Complex)
-    {
-        if (Matrix->Error == spSINGULAR) return 0.0;
+    {   if (Matrix->Error == spSINGULAR) return 0.0;
 
-        /* Find the bound on the size of the largest element over all factorization. */
+/* Find the bound on the size of the largest element over all factorization. */
         for (I = 1; I <= Matrix->Size; I++)
-        {
-            pDiag = Matrix->Diag[I];
+        {   pDiag = Matrix->Diag[I];
 
-            /* Lower triangular matrix. */
+/* Lower triangular matrix. */
             Pivot = 1.0 / pDiag->Real;
             Mag = ABS( Pivot );
             if (Mag > MaxRow) MaxRow = Mag;
             pElement = Matrix->FirstInRow[I];
             while (pElement != pDiag)
-            {
-                Mag = ABS( pElement->Real );
+            {   Mag = ABS( pElement->Real );
                 if (Mag > MaxRow) MaxRow = Mag;
                 pElement = pElement->NextInRow;
             }
 
-            /* Upper triangular matrix. */
+/* Upper triangular matrix. */
             pElement = Matrix->FirstInCol[I];
             AbsColSum = 1.0;  /* Diagonal of U is unity. */
             while (pElement != pDiag)
-            {
-                AbsColSum += ABS( pElement->Real );
+            {   AbsColSum += ABS( pElement->Real );
                 pElement = pElement->NextInCol;
             }
             if (AbsColSum > MaxCol) MaxCol = AbsColSum;
@@ -1944,11 +2008,9 @@ RealNumber spLargestElement(char* eMatrix)
     }
     else if (NOT Matrix->Complex)
     {   for (I = 1; I <= Matrix->Size; I++)
-        {
-            pElement = Matrix->FirstInCol[I];
+        {   pElement = Matrix->FirstInCol[I];
             while (pElement != NULL)
-            {
-                Mag = ABS( pElement->Real );
+            {   Mag = ABS( pElement->Real );
                 if (Mag > Max) Max = Mag;
                 pElement = pElement->NextInCol;
             }
@@ -1958,32 +2020,28 @@ RealNumber spLargestElement(char* eMatrix)
 #endif
 #if spCOMPLEX
     if (Matrix->Factored AND Matrix->Complex)
-    {
-        if (Matrix->Error == spSINGULAR) return 0.0;
+    {   if (Matrix->Error == spSINGULAR) return 0.0;
 
-        /* Find the bound on the size of the largest element over all factorization. */
+/* Find the bound on the size of the largest element over all factorization. */
         for (I = 1; I <= Matrix->Size; I++)
-        {
-            pDiag = Matrix->Diag[I];
+        {   pDiag = Matrix->Diag[I];
 
-            /* Lower triangular matrix. */
+/* Lower triangular matrix. */
             CMPLX_RECIPROCAL( cPivot, *pDiag );
-            Mag = CMPLX_1_NORM( cPivot );
+            Mag = CMPLX_INF_NORM( cPivot );
             if (Mag > MaxRow) MaxRow = Mag;
             pElement = Matrix->FirstInRow[I];
             while (pElement != pDiag)
-            {
-                Mag = CMPLX_1_NORM( *pElement );
+            {   Mag = CMPLX_INF_NORM( *pElement );
                 if (Mag > MaxRow) MaxRow = Mag;
                 pElement = pElement->NextInRow;
             }
 
-            /* Upper triangular matrix. */
+/* Upper triangular matrix. */
             pElement = Matrix->FirstInCol[I];
             AbsColSum = 1.0;  /* Diagonal of U is unity. */
             while (pElement != pDiag)
-            {
-                AbsColSum += CMPLX_1_NORM( *pElement );
+            {   AbsColSum += CMPLX_INF_NORM( *pElement );
                 pElement = pElement->NextInCol;
             }
             if (AbsColSum > MaxCol) MaxCol = AbsColSum;
@@ -1991,11 +2049,9 @@ RealNumber spLargestElement(char* eMatrix)
     }
     else if (Matrix->Complex)
     {   for (I = 1; I <= Matrix->Size; I++)
-        {
-            pElement = Matrix->FirstInCol[I];
+        {   pElement = Matrix->FirstInCol[I];
             while (pElement != NULL)
-            {
-                Mag = CMPLX_1_NORM( *pElement );
+            {   Mag = CMPLX_INF_NORM( *pElement );
                 if (Mag > Max) Max = Mag;
                 pElement = pElement->NextInCol;
             }
@@ -2006,45 +2062,53 @@ RealNumber spLargestElement(char* eMatrix)
     return MaxRow * MaxCol;
 }
 
-/*
- *  MATRIX ROUNDOFF ERROR
+
+
+
+/*!
+ *  This routine, along with spLargestElement(), are used to gauge the
+ *  stability of a factorization. See description of spLargestElement()
+ *  for more information.
  *
- *  >>> Returns:
- *  Returns a bound on the magnitude of the largest element in E = A - LU.
+ *  \return
+ *  Returns a bound on the magnitude of the largest element in
+ *  \f$ E = A - LU \f$.
  *
- *  >>> Arguments:
- *  eMatrix  <input>  (char *)
+ *  \param eMatrix
  *      Pointer to the matrix.
- *  Rho  <input>  (RealNumber)
+ *  \param Rho
  *      The bound on the magnitude of the largest element in any of the
  *      reduced submatrices.  This is the number computed by the function
  *      spLargestElement() when given a factored matrix.  If this number is
  *      negative, the bound will be computed automatically.
  */
 
-RealNumber spRoundoff(char* eMatrix, RealNumber Rho)
+spREAL
+spRoundoff( 
+    spMatrix eMatrix,
+    spREAL Rho
+)
 {
-    MatrixPtr  Matrix = (MatrixPtr)eMatrix;
-    ElementPtr pElement;
-    int Count, I, MaxCount = 0;
-    RealNumber Reid, Gear;
+MatrixPtr  Matrix = (MatrixPtr)eMatrix;
+register ElementPtr pElement;
+register int Count, I, MaxCount = 0;
+RealNumber Reid, Gear;
 
-    /* Begin `spRoundoff'. */
-    ASSERT( IS_SPARSE(Matrix) AND IS_FACTORED(Matrix) );
+/* Begin `spRoundoff'. */
+    ASSERT_IS_SPARSE( Matrix );
+    ASSERT_NO_ERRORS( Matrix );
+    ASSERT_IS_FACTORED( Matrix );
 
-    /* Compute Barlow's bound if it is not given. */
+/* Compute Barlow's bound if it is not given. */
     if (Rho < 0.0) Rho = spLargestElement( eMatrix );
 
-    /* Find the maximum number of off-diagonals in L if not previously computed. */
+/* Find the maximum number of off-diagonals in L if not previously computed. */
     if (Matrix->MaxRowCountInLowerTri < 0)
-    {
-        for (I = Matrix->Size; I > 0; I--)
-        {
-            pElement = Matrix->FirstInRow[I];
+    {   for (I = Matrix->Size; I > 0; I--)
+        {   pElement = Matrix->FirstInRow[I];
             Count = 0;
             while (pElement->Col < I)
-            {
-                Count++;
+            {   Count++;
                 pElement = pElement->NextInRow;
             }
             if (Count > MaxCount) MaxCount = Count;
@@ -2053,7 +2117,7 @@ RealNumber spRoundoff(char* eMatrix, RealNumber Rho)
     }
     else MaxCount = Matrix->MaxRowCountInLowerTri;
 
-    /* Compute error bound. */
+/* Compute error bound. */
     Gear = 1.01*((MaxCount + 1) * Matrix->RelThreshold + 1.0) * SQR(MaxCount);
     Reid = 3.01 * Matrix->Size;
 
@@ -2063,3 +2127,80 @@ RealNumber spRoundoff(char* eMatrix, RealNumber Rho)
         return (MACHINE_RESOLUTION * Rho * Reid);
 }
 #endif
+
+
+
+
+
+
+
+#if DOCUMENTATION
+/*!
+ *  This routine prints a short message describing the error error state
+ *  of sparse.  No message is produced if there is no error.
+ *  The error state is cleared.
+ *
+ *  \param eMatrix
+ *	Matrix for which the error message is to be printed.
+ *  \param Stream
+ *	Stream to which the error message is to be printed.
+ *  \param Originator
+ *	Name of originator of error message.  If NULL, `sparse' is used.
+ *	If zero-length string, no originator is printed.
+ */
+
+void
+spErrorMessage(
+    spMatrix eMatrix,
+    FILE *Stream,
+    char *Originator
+)
+{
+int Row, Col, Error;
+
+/* Begin `spErrorMessage'. */
+    if (eMatrix == NULL)
+	Error = spNO_MEMORY;
+    else
+    {   ASSERT_IS_SPARSE( (MatrixPtr)eMatrix );
+	Error = ((MatrixPtr)eMatrix)->Error;
+    }
+
+    if (Error == spOKAY) return;
+    if (Originator == NULL) Originator = "sparse";
+    if (Stream == NULL) Stream = stderr;
+    if (Originator[0] != '\0') fprintf( Stream, "%s: ", Originator );
+    if (Error >= spFATAL)
+	fprintf( Stream, "fatal error: ");
+    else
+	fprintf( Stream, "warning: ");
+/*
+ * Print particular error message.
+ * Do not use switch statement because error codes may not be unique.
+ */
+    if (Error == spPANIC)
+	fprintf( Stream, "Sparse called improperly.\n");
+    else if (Error == spNO_MEMORY)
+	fprintf( Stream, "insufficient memory available.\n");
+    else if (Error == spMANGLED)
+	fprintf( Stream, "matrix is mangled.\n");
+    else if (Error == spSINGULAR)
+    {   spWhereSingular( eMatrix, &Row, &Col );
+	fprintf( Stream, "singular matrix detected at row %d and column %d.\n",
+		 Row, Col);
+    }
+    else if (Error == spZERO_DIAG)
+    {   spWhereSingular( eMatrix, &Row, &Col );
+	fprintf( Stream, "zero diagonal detected at row %d and column %d.\n",
+		 Row, Col);
+    }
+    else if (Error == spSMALL_PIVOT)
+    {   fprintf( Stream,
+	    "unable to find a pivot that is larger than absolute threshold.\n");
+    }
+    else ABORT();
+
+    ((MatrixPtr)eMatrix)->Error = spOKAY;
+    return;
+}
+#endif /* DOCUMENTATION */

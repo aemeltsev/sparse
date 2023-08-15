@@ -94,6 +94,7 @@ static spError ReserveElements( MatrixPtr, int );
 static void InitializeElementBlocks( MatrixPtr, int, int );
 static void RecordAllocation( MatrixPtr, void* );
 static void AllocateBlockOfAllocationList( MatrixPtr );
+static spError MemoryError( spMatrix );
 
 
 
@@ -202,7 +203,10 @@ int  AllocatedSize;
     Matrix->FillinsRemaining = 0;
 
     RecordAllocation( Matrix, (void *)Matrix );
-    if (Matrix->Error == spNO_MEMORY) goto MemoryError;
+    if (Matrix->Error == spNO_MEMORY) {
+        *pError = MemoryError(Matrix);
+        return NULL;
+    }
 
 /* Take out the trash. */
     Matrix->TrashCan.Real = 0.0;
@@ -219,26 +223,36 @@ int  AllocatedSize;
 
 /* Allocate space in memory for Diag pointer vector. */
     CALLOC( Matrix->Diag, ElementPtr, SizePlusOne);
-    if (Matrix->Diag == NULL)
-        goto MemoryError;
+    if (Matrix->Diag == NULL) {
+        *pError = MemoryError(Matrix);
+        return NULL;
+    }
 
 /* Allocate space in memory for FirstInCol pointer vector. */
     CALLOC( Matrix->FirstInCol, ElementPtr, SizePlusOne);
-    if (Matrix->FirstInCol == NULL)
-        goto MemoryError;
+    if (Matrix->FirstInCol == NULL) {
+        *pError = MemoryError(Matrix);
+        return NULL;
+    }
 
 /* Allocate space in memory for FirstInRow pointer vector. */
     CALLOC( Matrix->FirstInRow, ElementPtr, SizePlusOne);
-    if (Matrix->FirstInRow == NULL)
-        goto MemoryError;
+    if (Matrix->FirstInRow == NULL) {
+        *pError = MemoryError(Matrix);
+        return NULL;
+    }
 
 /* Allocate space in memory for IntToExtColMap vector. */
-    if (( Matrix->IntToExtColMap = ALLOC(int, SizePlusOne)) == NULL)
-        goto MemoryError;
+    if (( Matrix->IntToExtColMap = ALLOC(int, SizePlusOne)) == NULL) {
+        *pError = MemoryError(Matrix);
+        return NULL;
+    }
 
 /* Allocate space in memory for IntToExtRowMap vector. */
-    if (( Matrix->IntToExtRowMap = ALLOC(int, SizePlusOne)) == NULL)
-        goto MemoryError;
+    if (( Matrix->IntToExtRowMap = ALLOC(int, SizePlusOne)) == NULL) {
+        *pError = MemoryError(Matrix);
+        return NULL;
+    }
 
 /* Initialize MapIntToExt vectors. */
     for (I = 1; I <= AllocatedSize; I++)
@@ -248,12 +262,16 @@ int  AllocatedSize;
 
 #if TRANSLATE
 /* Allocate space in memory for ExtToIntColMap vector. */
-    if (( Matrix->ExtToIntColMap = ALLOC(int, SizePlusOne)) == NULL)
-        goto MemoryError;
+    if (( Matrix->ExtToIntColMap = ALLOC(int, SizePlusOne)) == NULL) {
+        *pError = MemoryError(Matrix);
+        return NULL;
+    }
 
 /* Allocate space in memory for ExtToIntRowMap vector. */
-    if (( Matrix->ExtToIntRowMap = ALLOC(int, SizePlusOne)) == NULL)
-        goto MemoryError;
+    if (( Matrix->ExtToIntRowMap = ALLOC(int, SizePlusOne)) == NULL) {
+        *pError = MemoryError(Matrix);
+        return NULL;
+    }
 
 /* Initialize MapExtToInt vectors. */
     for (I = 1; I <= AllocatedSize; I++)
@@ -267,18 +285,20 @@ int  AllocatedSize;
 /* Allocate space for fill-ins and initial set of elements. */
     InitializeElementBlocks( Matrix, SPACE_FOR_ELEMENTS*AllocatedSize,
                                      SPACE_FOR_FILL_INS*AllocatedSize );
-    if (Matrix->Error == spNO_MEMORY)
-        goto MemoryError;
+    if (Matrix->Error == spNO_MEMORY) {
+        *pError = MemoryError(Matrix);
+        return NULL;
+    }
 
     return (char *)Matrix;
 
-MemoryError:
+//MemoryError:
 
 /* Deallocate matrix and return no pointer to matrix if there is not enough
    memory. */
-    *pError = spNO_MEMORY;
-    spDestroy( (char *)Matrix);
-    return NULL;
+//    *pError = spNO_MEMORY;
+//    spDestroy( (char *)Matrix);
+//    return NULL;
 }
 
 
@@ -653,7 +673,14 @@ register  AllocationListPtr  ListPtr, NextListPtr;
     ListPtr = Matrix->TopOfAllocationList;
     while (ListPtr != NULL)
     {   NextListPtr = ListPtr->NextRecord;
-        free( ListPtr->AllocatedPtr );
+        /* by Carlos Christoffersen 8/24/99:
+         * To prevent illegal memory accesss  */
+        if((char*)ListPtr == ListPtr->AllocatedPtr) {
+            free(ListPtr);
+         }
+        else {
+            free( ListPtr->AllocatedPtr );
+         }
         ListPtr = NextListPtr;
     }
     return;
@@ -853,4 +880,17 @@ spElementCount( spMatrix eMatrix )
 
     ASSERT_IS_SPARSE( (MatrixPtr)eMatrix );
     return ((MatrixPtr)eMatrix)->Elements;
+}
+
+/* use this for replace "goto" in spCreate */
+/*!
+ * \brief MemoryError Deallocate matrix and return a variable indicating that there is not enough memory
+ * \param eMatrix Pointer to matrix.
+ * \return macro
+ */
+spError
+MemoryError( spMatrix eMatrix )
+{
+    spDestroy((char*)eMatrix);
+    return spNO_MEMORY;
 }

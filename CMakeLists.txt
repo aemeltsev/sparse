@@ -1,11 +1,12 @@
-﻿cmake_minimum_required(VERSION 3.10)
+﻿cmake_minimum_required(VERSION 3.8)
 ##### Library Versioning
 project(sparse
     VERSION 1.4
     DESCRIPTION "A Sparse Linear Equation Solver"
-    LANGUAGES C)
+    LANGUAGES C
+)
 
-set(DEFAULT_BUILD_TYPE "Release")
+option(SPARSE_USE_TEST "Enable Tests" ON)
 
 ##### Use C standard of a type
 option(SPARSE_USE_C99 "" OFF)
@@ -15,6 +16,7 @@ else()
     set(CMAKE_C_STANDARD 11)
 endif()
 set(CMAKE_C_STANDARD_REQUIRED YES)
+set(DEFAULT_BUILD_TYPE "Release")
 
 ##### Set build library type using two different targets
 option(SPARSE_SHARED "Shared build" OFF)
@@ -103,25 +105,21 @@ endif()
 
 target_include_directories(${PROJECT_NAME}
     PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
 
     PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 ##### Target for header-only usage
-#add_library(${PROJECT_NAME}_headers INTERFACE)
-#target_include_directories(${PROJECT_NAME}_headers INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
-
-#target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-#target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_INCLUDE_DIRS})
+add_library(${PROJECT_NAME}_headers INTERFACE)
+target_include_directories(${PROJECT_NAME}_headers INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 ##### Test Configuration
-option(SPARSE_USE_TEST "Enable Tests" OFF)
 if(SPARSE_USE_TEST)
     #include(CTest)
     #enable_testing()
-    #add_subdirectory(../test)
+    add_subdirectory(test)
 endif()
 
 ##### Set installation directory. Install commands for target to be "installed"
@@ -132,7 +130,7 @@ install(TARGETS ${PROJECT_NAME}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-install(DIRECTORY lib DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+install(DIRECTORY include/${PROJECT_NAME} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         PATTERN ".*" EXCLUDE)
 
 # Exporting targets for a proper install
@@ -161,7 +159,7 @@ else()
     set(libdir "\${exec_prefix}/${CMAKE_INSTALL_LIBDIR}")
 endif()
 set(PACKAGE_VERSION "${PROJECT_VERSION}")
-#configure_file(sparse.pc.in sparse.pc @ONLY)
+configure_file(sparse.pc.in sparse.pc @ONLY)
 
-#install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sparse.pc
-#    DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sparse.pc
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)

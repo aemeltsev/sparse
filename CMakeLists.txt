@@ -69,10 +69,11 @@ endif()
 ##### Target project files
 set(
     SOURCES
-    src/spConfig.h
-    src/spDefs.h
-    src/spMatrix.h
-    #src/spSpice3.h
+    include/spCommon.h
+    include/spConfig.h
+    include/spDefs.h
+    include/spMatrix.h
+    include/spSpice3.h
     src/spAllocate.c
     src/spBuild.c
     src/spFactor.c
@@ -82,6 +83,7 @@ set(
     src/spSolve.c
     src/spTest.c
     src/spUtils.c
+    src/spInterface.c
     )
 
 add_library(${PROJECT_NAME}
@@ -105,8 +107,8 @@ endif()
 
 target_include_directories(${PROJECT_NAME}
     PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 
     PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src)

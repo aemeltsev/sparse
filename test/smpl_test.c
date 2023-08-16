@@ -10,7 +10,7 @@
 
 #include <stdio.h>
 #include <math.h>
-#include "../src/spMatrix.h"
+#include "../include/spMatrix.h"
 
 int main( int argc, char **argv )
 {

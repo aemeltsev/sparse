@@ -33,9 +33,6 @@
 #ifndef spCONFIG_DEFS
 #define spCONFIG_DEFS
 
-
-
-
 #ifdef spINSIDE_SPARSE
 /*
  *  OPTIONS
@@ -317,12 +314,6 @@
 
 #ifdef spINSIDE_SPARSE
 
-
-
-
-
-
-
 /*
  *  MATRIX CONSTANTS
  *
@@ -450,15 +441,6 @@
  */
 #define  PRINTER_WIDTH  80
 
-
-
-
-
-
-
-
-
-
 #endif /* spINSIDE_SPARSE */
 /*
  * PORTABILITY MACROS
@@ -506,12 +488,6 @@
 
 #ifdef spINSIDE_SPARSE
 
-
-
-
-
-
-
 /*
  *  MACHINE CONSTANTS
  *
@@ -537,11 +513,6 @@
 /*! The largest possible value of longs. */
 #define  LARGEST_LONG_INTEGER    LONG_MAX
 
-
-
-
-
-
 /* ANNOTATION */
 /*!
  * This macro changes the amount of annotation produced by the matrix

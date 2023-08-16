@@ -28,56 +28,51 @@
  */
 
 #include <stddef.h>
-#ifdef lint
-#undef  REAL
-#undef  spCOMPLEX
-#undef  EXPANDABLE
-#undef  TRANSLATE
-#undef  INITIALIZE
-#undef  DELETE
-#undef  STRIP
-#undef  MODIFIED_NODAL
-#undef  QUAD_ELEMENT
-#undef  TRANSPOSE
-#undef  SCALING
-#undef  DOCUMENTATION
-#undef  MULTIPLICATION
-#undef  DETERMINANT
-#undef  CONDITION
-#undef  PSEUDOCONDITION
-#undef  FORTRAN
-#undef  DEBUG
+#include <stdlib.h>
+//#ifdef lint
+//#undef  REAL
+//#undef  spCOMPLEX
+//#undef  EXPANDABLE
+//#undef  TRANSLATE
+//#undef  INITIALIZE
+//#undef  DELETE
+//#undef  STRIP
+//#undef  MODIFIED_NODAL
+//#undef  QUAD_ELEMENT
+//#undef  TRANSPOSE
+//#undef  SCALING
+//#undef  DOCUMENTATION
+//#undef  MULTIPLICATION
+//#undef  DETERMINANT
+//#undef  CONDITION
+//#undef  PSEUDOCONDITION
+//#undef  FORTRAN
+//#undef  DEBUG
 
-#define  REAL                           YES
-#define  spCOMPLEX                      YES
-#define  EXPANDABLE                     YES
-#define  TRANSLATE                      YES
-#define  INITIALIZE                     YES
-#define  DELETE                         YES
-#define  STRIP                          YES
-#define  MODIFIED_NODAL                 YES
-#define  QUAD_ELEMENT                   YES
-#define  TRANSPOSE                      YES
-#define  SCALING                        YES
-#define  DOCUMENTATION                  YES
-#define  MULTIPLICATION                 YES
-#define  DETERMINANT                    YES
-#define  CONDITION                      YES
-#define  PSEUDOCONDITION                YES
-#define  FORTRAN                        YES
-#define  DEBUG                          YES
+//#define  REAL                           YES
+//#define  spCOMPLEX                      YES
+//#define  EXPANDABLE                     YES
+//#define  TRANSLATE                      YES
+//#define  INITIALIZE                     YES
+//#define  DELETE                         YES
+//#define  STRIP                          YES
+//#define  MODIFIED_NODAL                 YES
+//#define  QUAD_ELEMENT                   YES
+//#define  TRANSPOSE                      YES
+//#define  SCALING                        YES
+//#define  DOCUMENTATION                  YES
+//#define  MULTIPLICATION                 YES
+//#define  DETERMINANT                    YES
+//#define  CONDITION                      YES
+//#define  PSEUDOCONDITION                YES
+//#define  FORTRAN                        YES
+//#define  DEBUG                          YES
 
-#define  LINT                           YES
-#else /* not lint */
-#define  LINT                           NO
-#endif /* not lint */
+//#define  LINT                           YES
+//#else /* not lint */
+//#define  LINT                           NO
+//#endif /* not lint */
 
-
-
-
-
-
-
 /*
  *   MACRO DEFINITIONS
  *
@@ -103,7 +98,7 @@
 #endif
 
 /* Define macros for validating matrix. */
-#define  SPARSE_ID			0xDeadBeef	/* Arbitrary. */
+#define  SPARSE_ID			0x5F3759DF /*0xDeadBeef*/	/* Arbitrary. */
 #define  IS_SPARSE(matrix)		(((matrix) != NULL) AND \
                                 	 ((matrix)->ID == SPARSE_ID))
 #define  NO_ERRORS(matrix)		(((matrix)->Error >= spOKAY) AND \
@@ -362,11 +357,6 @@
     }                                                                   \
 }
 
-
-
-
-
-
 /*
  *  ASSERT and ABORT
  *
@@ -419,11 +409,6 @@
 #define  ABORT()		abort()
 #endif
 
-
-
-
-
-
 /*
  *  IMAGINARY VECTORS
  *
@@ -444,20 +429,15 @@
 #define IMAG_VECT_DECL
 #endif
 
-
-
-
-
-
 /*
  * MEMORY ALLOCATION
  */
 
-spcEXTERN void *malloc(size_t size);
-spcEXTERN void *calloc(size_t nmemb, size_t size);
-spcEXTERN void *realloc(void *ptr, size_t size);
-spcEXTERN void free(void *ptr);
-spcEXTERN void abort(void);
+//spcEXTERN void *malloc(size_t size);
+//spcEXTERN void *calloc(size_t nmemb, size_t size);
+//spcEXTERN void *realloc(void *ptr, size_t size);
+//spcEXTERN void free(void *ptr);
+//spcEXTERN void abort(void);
 
 #define ALLOC(type,number)  ((type *)malloc((unsigned)(sizeof(type)*(number))))
 #define REALLOC(ptr,type,number)  \
@@ -472,12 +452,6 @@ spcEXTERN void abort(void);
         for(i=(number)-1;i>=0; i--) ptr[i] = (type) 0;  \
 }
 
-
-
-
-
-
-
 /*
  * Utility Functions
  */
@@ -497,26 +471,14 @@ spcEXTERN void abort(void);
         } \
         else (product) = (op1)*(op2);
 
-
-
-
-
-
 /*
  *  REAL NUMBER
  */
 
 /* Begin `RealNumber'. */
 
-typedef  spREAL  RealNumber, *RealVector;
+typedef  double  RealNumber, *RealVector;
 
-
-
-
-
-
-
-
 /*
  *  COMPLEX NUMBER DATA STRUCTURE
  *
@@ -536,13 +498,6 @@ typedef  struct
     RealNumber  Imag;
 } ComplexNumber, *ComplexVector;
 
-
-
-
-
-
-
-
 /*
  *  MATRIX ELEMENT DATA STRUCTURE
  *
@@ -605,13 +560,6 @@ struct  MatrixElement
 typedef  struct MatrixElement  *ElementPtr;
 typedef  ElementPtr  *ArrayOfElementPtrs;
 
-
-
-
-
-
-
-
 /*
  *  ALLOCATION DATA STRUCTURE
  *
@@ -636,14 +584,6 @@ struct AllocationRecord
 
 typedef  struct  AllocationRecord  *AllocationListPtr;
 
-
-
-
-
-
-
-
-
 /*
  *  FILL-IN LIST DATA STRUCTURE
  *
@@ -670,15 +610,6 @@ struct FillinListNodeStruct
     struct      FillinListNodeStruct  *Next;
 };
 
-
-
-
-
-
-
-
-
-
 /*
  *  MATRIX FRAME DATA STRUCTURE
  *
@@ -922,24 +853,21 @@ struct  MatrixFrame
 };
 typedef  struct MatrixFrame  *MatrixPtr;
 
-
-
-
 /*
  *  Declarations
  */
 
-spcEXTERN ElementPtr spcGetElement( MatrixPtr );
-spcEXTERN ElementPtr spcGetFillin( MatrixPtr );
-spcEXTERN ElementPtr spcFindDiag( MatrixPtr, int );
-spcEXTERN ElementPtr spcCreateElement( MatrixPtr, int, int,
-				ElementPtr*, ElementPtr*, int );
-spcEXTERN void spcCreateInternalVectors( MatrixPtr );
-spcEXTERN void spcLinkRows( MatrixPtr );
-spcEXTERN void spcColExchange( MatrixPtr, int, int );
-spcEXTERN void spcRowExchange( MatrixPtr, int, int );
+extern ElementPtr spcGetElement( MatrixPtr );
+extern ElementPtr spcGetFillin( MatrixPtr );
+extern ElementPtr spcFindDiag( MatrixPtr, int );
+extern ElementPtr spcCreateElement( MatrixPtr, int, int,
+                                    ElementPtr*, ElementPtr*, int );
+extern void spcCreateInternalVectors( MatrixPtr );
+extern void spcLinkRows( MatrixPtr );
+extern void spcColExchange( MatrixPtr, int, int );
+extern void spcRowExchange( MatrixPtr, int, int );
 
-spcEXTERN char spcMatrixIsNotValid[];
-spcEXTERN char spcErrorsMustBeCleared[];
-spcEXTERN char spcMatrixMustBeFactored[];
-spcEXTERN char spcMatrixMustNotBeFactored[];
+extern char spcMatrixIsNotValid[];
+extern char spcErrorsMustBeCleared[];
+extern char spcMatrixMustBeFactored[];
+extern char spcMatrixMustNotBeFactored[];

@@ -27,10 +27,10 @@
  *  $Revision: 1.2 $
  */
 
-
-
-
 #ifndef  spOKAY
+
+#include <stddef.h>
+#include <stdlib.h>
 
 /*
  *  IMPORTS
@@ -42,11 +42,6 @@
 
 #include "spConfig.h"
 
-
-
-
-
-
 /*
  *  ERROR KEYWORDS
  *

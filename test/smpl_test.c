@@ -51,13 +51,14 @@ int main( int argc, char **argv )
 
         /* Solve the matrix equations Ax = b for x. */
         err = spFactor( A );
-        if (err >= spFATAL) {
-            spErrorMessage( A, stderr, argv[0] );
+        if(err >= spFATAL)
+        {
+            spErrorMessage(A, stderr, argv[0]);
             return 1;
         }
 
-        spSolve( A, (spREAL *)b, (spREAL *)x );
-        printf( "f = %f, h = %f\n", f, sqrt(x[2].re*x[2].re + x[2].im*x[2].im));
+        spSolve(A, (spREAL *)b, (spREAL *)x);
+        printf("f = %f, h = %f\n", f, sqrt(x[2].re*x[2].re + x[2].im*x[2].im));
     }
     return 0;
 }

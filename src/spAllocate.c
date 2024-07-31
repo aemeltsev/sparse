@@ -65,10 +65,11 @@ static char RCSid[] =
  */
 
 #define spINSIDE_SPARSE
-#include <stdio.h>
-#include "spConfig.h"
-#include "spMatrix.h"
-#include "spDefs.h"
+//#include <stdio.h>
+#include "../include/spCommon.h"
+//#include "../include/spConfig.h"
+//#include "../include/spMatrix.h"
+//#include "../include/spDefs.h"
 
 
 
@@ -87,7 +88,7 @@ char spcMatrixMustNotBeFactored[] = "Matrix must not be factored";
 
 
 /*
- *  Function declarations
+ *  Function declarations only this file
  */
 
 static spError ReserveElements( MatrixPtr, int );

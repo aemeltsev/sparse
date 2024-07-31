@@ -33,6 +33,7 @@
 #ifndef spCONFIG_DEFS
 #define spCONFIG_DEFS
 
+
 #ifdef spINSIDE_SPARSE
 /*
  *  OPTIONS
@@ -442,6 +443,8 @@
 #define  PRINTER_WIDTH  80
 
 #endif /* spINSIDE_SPARSE */
+
+
 /*
  * PORTABILITY MACROS
  */
@@ -461,6 +464,7 @@
 #if defined(__cplusplus) || defined(c_plusplus)
     /*
      * Definitions for C++
+     * If you want to get the pointer address in order to cast it into another type later on: use (void *)
      */
 #   define spcEXTERN		extern "C"
 #   define spcNO_ARGS
@@ -470,14 +474,16 @@
 #ifdef __STDC__
     /*
      * Definitions for ANSI C
+     * If you want to get the pointer address in order to cast it into another type later on: use (void *)
      */
 #   define spcEXTERN		extern
 #   define spcNO_ARGS		void
 #   define spcCONST		const
-    typedef void *spGenericPtr;
+    typedef void * spGenericPtr;
 #   else
     /*
      * Definitions for K&R C -- ignore function prototypes
+     * If you want to perform pointer arithmetic: use (char *)
      */
 #   define spcEXTERN		extern
 #   define spcNO_ARGS

@@ -353,6 +353,6 @@ spcEXTERN  int        spFileVector( spMatrix, char* , spREAL[] );
 spcEXTERN  void       spMultiply( spMatrix, spREAL[], spREAL[] );
 spcEXTERN  void       spMultTransposed( spMatrix, spREAL[], spREAL[] );
 spcEXTERN  void       spSolve( spMatrix, spREAL[], spREAL[] );
-spcEXTERN  void       spSolveTransposed( spMatrix,spREAL[], spREAL[] );
+spcEXTERN  void       spSolveTransposed( spMatrix, spREAL[], spREAL[] );
 #endif /* NOT  (spCOMPLEX && spSEPARATED_COMPLEX_VECTORS) */
 #endif  /* spOKAY */

@@ -65,10 +65,11 @@ static char RCSid[] =
  */
 
 #define spINSIDE_SPARSE
-#include <stdio.h>
-#include "spConfig.h"
-#include "spMatrix.h"
-#include "spDefs.h"
+//#include <stdio.h>
+#include "../include/spCommon.h"
+//#include "../include/spConfig.h"
+//#include "../include/spMatrix.h"
+//#include "../include/spDefs.h"
 
 
 
@@ -184,7 +185,8 @@ spFindElement(
 {
 MatrixPtr  Matrix = (MatrixPtr)eMatrix;
 ElementPtr  pElement;
-int StartAt, Min = LARGEST_LONG_INTEGER;
+int StartAt = 0;
+long Min = LARGEST_LONG_INTEGER;
 #define BorderRight 0	/* Start at left border, move right. */
 #define BorderDown  1	/* Start at top border, move down. */
 #define DiagRight   2	/* Start at diagonal, move right. */

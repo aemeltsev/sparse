@@ -24,7 +24,6 @@
  *  SolveComplexTransposedMatrix
  */
 
-
 /*
  *  Revision and copyright information.
  *
@@ -38,8 +37,6 @@ static char copyright[] =
 static char RCSid[] =
     "@(#)$Header: /cvsroot/sparse/src/spSolve.c,v 1.3 2003/06/29 04:19:52 kundert Exp $";
 #endif
-
-
 
 /*
  *  IMPORTS
@@ -55,13 +52,10 @@ static char RCSid[] =
 
 #define spINSIDE_SPARSE
 #include <stdio.h>
-#include "../include/spConfig.h"
-#include "../include/spMatrix.h"
-#include "../include/spDefs.h"
-
-
-
-
+#include "../include/spCommon.h"
+//#include "../include/spConfig.h"
+//#include "../include/spMatrix.h"
+//#include "../include/spDefs.h"
 /*
  * Function declarations
  */
@@ -77,12 +71,6 @@ static void SolveComplexTransposedMatrix( MatrixPtr,
 			RealVector, RealVector );
 #endif
 
-
-
-
-
-
-
 /*!
  *  Performs forward elimination and back substitution to find the
  *  unknown vector from the \a RHS vector and factored matrix.  This
@@ -159,7 +147,7 @@ register  RealVector  Intermediate;
 register  RealNumber  Temp;
 register  int  I, *pExtOrder, Size;
 ElementPtr  pPivot;
-void SolveComplexMatrix();
+//void SolveComplexMatrix();
 
 /* Begin `spSolve'. */
     ASSERT_IS_SPARSE( Matrix );
@@ -224,16 +212,6 @@ void SolveComplexMatrix();
 #endif /* REAL */
 }
 
-
-
-
-
-
-
-
-
-
-
 #if spCOMPLEX
 /*!
  *  Performs forward elimination and back substitution to find the
@@ -387,19 +365,6 @@ ComplexNumber  Temp;
 }
 #endif /* spCOMPLEX */
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 #if TRANSPOSE
 /*!
  *  Performs forward elimination and back substitution to find the
@@ -471,7 +436,7 @@ register  RealVector  Intermediate;
 register  int  I, *pExtOrder, Size;
 ElementPtr  pPivot;
 RealNumber  Temp;
-void SolveComplexTransposedMatrix();
+//void SolveComplexTransposedMatrix();
 
 /* Begin `spSolveTransposed'. */
     ASSERT_IS_SPARSE( Matrix );

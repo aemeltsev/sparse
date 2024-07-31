@@ -64,9 +64,10 @@ static char RCSid[] =
 
 #define spINSIDE_SPARSE
 #include <stdio.h>
-#include "../include/spConfig.h"
-#include "../include/spMatrix.h"
-#include "../include/spDefs.h"
+#include "../include/spCommon.h"
+//#include "../include/spConfig.h"
+//#include "../include/spMatrix.h"
+//#include "../include/spDefs.h"
 
 
 
@@ -203,8 +204,9 @@ spOrderAndFactor(
 MatrixPtr  Matrix = (MatrixPtr)eMatrix;
 ElementPtr  pPivot;
 int  Step, Size;
-ElementPtr SearchForPivot();
-RealNumber LargestInCol, FindLargestInCol();
+//ElementPtr SearchForPivot();
+RealNumber LargestInCol;
+//RealNumber FindLargestInCol();
 
 /* Begin `spOrderAndFactor'. */
     ASSERT_IS_SPARSE( Matrix );
@@ -1022,10 +1024,10 @@ SearchForPivot(
 )
 {
 register ElementPtr  ChosenPivot;
-ElementPtr  SearchForSingleton();
-ElementPtr  QuicklySearchDiagonal();
-ElementPtr  SearchDiagonal();
-ElementPtr  SearchEntireMatrix();
+//ElementPtr  SearchForSingleton();
+//ElementPtr  QuicklySearchDiagonal();
+//ElementPtr  SearchDiagonal();
+//ElementPtr  SearchEntireMatrix();
 
 /* Begin `SearchForPivot'. */
 
@@ -1126,7 +1128,8 @@ register  ElementPtr  ChosenPivot;
 register  int  I;
 register  long  *pMarkowitzProduct;
 int  Singletons;
-RealNumber  PivotMag, FindBiggestInColExclude();
+RealNumber  PivotMag;
+//RealNumber sFindBiggestInColExclude();
 
 /* Begin `SearchForSingleton'. */
 /* Initialize pointer that is to scan through MarkowitzProduct vector. */
@@ -1548,7 +1551,7 @@ register  ElementPtr  pDiag;
 int  I;
 ElementPtr  ChosenPivot, pOtherInRow, pOtherInCol;
 RealNumber  Magnitude, LargestInCol, LargestOffDiagonal;
-RealNumber  FindBiggestInColExclude();
+//RealNumber  FindBiggestInColExclude();
 
 /* Begin `QuicklySearchDiagonal'. */
     ChosenPivot = NULL;
@@ -1712,10 +1715,10 @@ register  int  J;
 register long  MinMarkowitzProduct, *pMarkowitzProduct;
 register  int  I;
 register  ElementPtr  pDiag;
-int  NumberOfTies, Size = Matrix->Size;
+int  NumberOfTies = 0, Size = Matrix->Size;
 ElementPtr  ChosenPivot;
-RealNumber  Magnitude, Ratio, RatioOfAccepted, LargestInCol;
-RealNumber  FindBiggestInColExclude();
+RealNumber  Magnitude, Ratio, LargestInCol, RatioOfAccepted = 0;
+//RealNumber  FindBiggestInColExclude();
 
 /* Begin `SearchDiagonal'. */
     ChosenPivot = NULL;
@@ -1839,11 +1842,11 @@ SearchEntireMatrix(
 {
 register  int  I, Size = Matrix->Size;
 register  ElementPtr  pElement;
-int  NumberOfTies;
+int  NumberOfTies = 0;
 long  Product, MinMarkowitzProduct;
-ElementPtr  ChosenPivot, pLargestElement;
-RealNumber  Magnitude, LargestElementMag, Ratio, RatioOfAccepted, LargestInCol;
-RealNumber  FindLargestInCol();
+ElementPtr  ChosenPivot, pLargestElement = NULL;
+RealNumber  Magnitude, LargestElementMag, Ratio, LargestInCol, RatioOfAccepted = 0;
+//RealNumber  FindLargestInCol();
 
 /* Begin `SearchEntireMatrix'. */
     ChosenPivot = NULL;

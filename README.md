@@ -1,5 +1,7 @@
-## Sparse1.3 - A Sparse Linear Equation Solver
+## :straight_ruler: Sparse - flexible package for solve large sparse systems of linear equations
+
+
 
 Kenneth S. Kundert
-Alberto Sangiovanni-Vincentelli
+
 University of California, Berkeley
